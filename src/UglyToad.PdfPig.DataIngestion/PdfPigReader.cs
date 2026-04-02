@@ -8,12 +8,13 @@ namespace UglyToad.PdfPig.DataIngestion
 
     /// <summary>
     /// Reads PDF documents using PdfPig and converts them to MEDI <see cref="IngestionDocument"/> format.
-    /// Supports pluggable page segmentation via <see cref="IPageSegmenter"/>.
+    /// Supports pluggable page segmentation via <see cref="IPageSegmenter"/> and configurable
+    /// reading modes via <see cref="PdfReadingMode"/>.
     /// </summary>
     public class PdfPigReader : IngestionDocumentReader
     {
         private readonly IPageSegmenter segmenter;
-        private readonly bool renderPageImages;
+        private readonly PdfReadingMode mode;
         private readonly int renderDpi;
 
         /// <summary>
@@ -21,17 +22,19 @@ namespace UglyToad.PdfPig.DataIngestion
         /// </summary>
         /// <param name="segmenter">
         /// Page segmenter for layout analysis. Defaults to <see cref="DefaultPageSegmenter"/> if <see langword="null"/>.
+        /// Ignored when <paramref name="mode"/> is <see cref="PdfReadingMode.VisionOnly"/>.
         /// </param>
-        /// <param name="renderPageImages">
-        /// Whether to render each page as a PNG image and store it in section metadata. Defaults to <see langword="true"/>.
+        /// <param name="mode">
+        /// Controls the text extraction strategy. Defaults to <see cref="PdfReadingMode.TextOnly"/>.
         /// </param>
         /// <param name="renderDpi">
-        /// The DPI to use when rendering page images. Defaults to 150.
+        /// The DPI to use when rendering page images. Applies to <see cref="PdfReadingMode.Hybrid"/>
+        /// and <see cref="PdfReadingMode.VisionOnly"/> modes. Defaults to 150.
         /// </param>
-        public PdfPigReader(IPageSegmenter? segmenter = null, bool renderPageImages = true, int renderDpi = 150)
+        public PdfPigReader(IPageSegmenter? segmenter = null, PdfReadingMode mode = PdfReadingMode.TextOnly, int renderDpi = 150)
         {
             this.segmenter = segmenter ?? DefaultPageSegmenter.Instance;
-            this.renderPageImages = renderPageImages;
+            this.mode = mode;
             this.renderDpi = renderDpi;
         }
 
@@ -49,15 +52,15 @@ namespace UglyToad.PdfPig.DataIngestion
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var page = pdfDocument.GetPage(i);
-                var words = page.GetWords();
-                var blocks = segmenter.GetBlocks(words);
 
                 var section = new IngestionDocumentSection
                 {
                     PageNumber = i
                 };
 
-                if (renderPageImages)
+                var renderImages = mode is PdfReadingMode.Hybrid or PdfReadingMode.VisionOnly;
+
+                if (renderImages)
                 {
                     var imageBytes = PageImageRenderer.RenderPage(page, renderDpi);
                     section.Metadata["page_image"] = imageBytes;
@@ -65,32 +68,37 @@ namespace UglyToad.PdfPig.DataIngestion
                     section.Metadata["page_height"] = page.Height;
                 }
 
-                foreach (var block in blocks)
+                if (mode is not PdfReadingMode.VisionOnly)
                 {
-                    if (string.IsNullOrEmpty(block.Text))
+                    var words = page.GetWords();
+                    var blocks = segmenter.GetBlocks(words);
+
+                    foreach (var block in blocks)
                     {
-                        continue;
+                        if (string.IsNullOrEmpty(block.Text))
+                        {
+                            continue;
+                        }
+
+                        var paragraph = new IngestionDocumentParagraph(block.Text)
+                        {
+                            Text = block.Text,
+                            PageNumber = i
+                        };
+
+                        var bbox = block.BoundingBox;
+                        paragraph.Metadata["BoundingBox.Left"] = bbox.Left;
+                        paragraph.Metadata["BoundingBox.Bottom"] = bbox.Bottom;
+                        paragraph.Metadata["BoundingBox.Right"] = bbox.Right;
+                        paragraph.Metadata["BoundingBox.Top"] = bbox.Top;
+
+                        section.Elements.Add(paragraph);
                     }
-
-                    var paragraph = new IngestionDocumentParagraph(block.Text)
-                    {
-                        Text = block.Text,
-                        PageNumber = i
-                    };
-
-                    var bbox = block.BoundingBox;
-                    paragraph.Metadata["BoundingBox.Left"] = bbox.Left;
-                    paragraph.Metadata["BoundingBox.Bottom"] = bbox.Bottom;
-                    paragraph.Metadata["BoundingBox.Right"] = bbox.Right;
-                    paragraph.Metadata["BoundingBox.Top"] = bbox.Top;
-
-                    section.Elements.Add(paragraph);
                 }
 
-                // For scanned/image-only pages with no extractable text,
-                // create a placeholder element so VisionOcrEnricher can
-                // process the page image via vision LLM OCR.
-                if (section.Elements.Count == 0 && renderPageImages)
+                // For scanned/image-only pages (or VisionOnly mode) with no elements,
+                // create a placeholder so VisionOcrEnricher can process the page image.
+                if (section.Elements.Count == 0 && renderImages)
                 {
                     var placeholder = new IngestionDocumentParagraph("[scanned-page]")
                     {

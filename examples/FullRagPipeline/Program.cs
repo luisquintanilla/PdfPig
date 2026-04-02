@@ -13,14 +13,14 @@ var ollamaEndpoint = Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT") ?? "h
 if (pdfPath is null || !File.Exists(pdfPath))
 {
     Console.WriteLine("Usage: dotnet run -- <pdf-path> [model-name]");
-    Console.WriteLine($"  Levels 1-3 run without Ollama. Level 4 requires Ollama at {ollamaEndpoint}.");
+    Console.WriteLine($"  Levels 1-4 run without Ollama. Level 5 requires Ollama at {ollamaEndpoint}.");
     return;
 }
 
 // ─── Level 1: Basic Text Extraction ───
 Console.WriteLine("=== Level 1: Basic Text Extraction ===");
 Console.WriteLine("  PdfPigReader() — flat text, no layout analysis");
-var basicReader = new PdfPigReader(renderPageImages: false);
+var basicReader = new PdfPigReader();
 using (var stream1 = File.OpenRead(pdfPath))
 {
     var doc1 = await basicReader.ReadAsync(stream1, pdfPath, "application/pdf");
@@ -46,8 +46,7 @@ using (var stream1 = File.OpenRead(pdfPath))
 Console.WriteLine("\n=== Level 2: Heuristic Layout ===");
 Console.WriteLine("  PdfPigReader(segmenter: HeuristicPageSegmenter.Instance) — structural blocks");
 var heuristicReader = new PdfPigReader(
-    segmenter: HeuristicPageSegmenter.Instance,
-    renderPageImages: false);
+    segmenter: HeuristicPageSegmenter.Instance);
 using (var stream2 = File.OpenRead(pdfPath))
 {
     var doc2 = await heuristicReader.ReadAsync(stream2, pdfPath, "application/pdf");
@@ -75,12 +74,12 @@ using (var stream2 = File.OpenRead(pdfPath))
     }
 }
 
-// ─── Level 3: Page Image Rendering ───
-Console.WriteLine("\n=== Level 3: Page Image Rendering ===");
-Console.WriteLine("  PdfPigReader(segmenter: ..., renderPageImages: true) — images for vision models");
+// ─── Level 3: Hybrid Mode (Text + Images) ───
+Console.WriteLine("\n=== Level 3: Hybrid Mode ===");
+Console.WriteLine("  PdfPigReader(segmenter: ..., mode: PdfReadingMode.Hybrid) — text + images for vision models");
 var imageReader = new PdfPigReader(
     segmenter: HeuristicPageSegmenter.Instance,
-    renderPageImages: true);
+    mode: PdfReadingMode.Hybrid);
 IngestionDocument doc3;
 using (var stream3 = File.OpenRead(pdfPath))
 {
@@ -107,8 +106,29 @@ foreach (var section in doc3.Sections)
     Console.WriteLine($"  Page {section.PageNumber}: {section.Elements.Count} element(s), {imageInfo}{dims}");
 }
 
-// ─── Level 4: Vision Enrichment (requires Ollama) ───
-Console.WriteLine("\n=== Level 4: Vision Enrichment (Ollama) ===");
+// ─── Level 4: VisionOnly Mode ───
+Console.WriteLine("\n=== Level 4: VisionOnly Mode ===");
+Console.WriteLine("  PdfPigReader(mode: PdfReadingMode.VisionOnly) — all pages sent to VLM, no text extraction");
+var visionReader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+using (var streamV = File.OpenRead(pdfPath))
+{
+    var docV = await visionReader.ReadAsync(streamV, pdfPath, "application/pdf");
+    Console.WriteLine($"  Pages: {docV.Sections.Count}");
+    foreach (var section in docV.Sections)
+    {
+        var imageInfo = "(no image)";
+        if (section.HasMetadata &&
+            section.Metadata.TryGetValue("page_image", out var vImgObj) &&
+            vImgObj is byte[] vImgBytes)
+        {
+            imageInfo = $"image: {vImgBytes.Length:N0} bytes";
+        }
+        Console.WriteLine($"  Page {section.PageNumber}: {section.Elements.Count} element(s), {imageInfo}");
+    }
+}
+
+// ─── Level 5: Vision Enrichment (requires Ollama) ───
+Console.WriteLine("\n=== Level 5: Vision Enrichment (Ollama) ===");
 try
 {
     using var httpClient = new HttpClient
@@ -186,7 +206,7 @@ catch (HttpRequestException ex)
     Console.WriteLine($"  Error: {ex.Message}");
     Console.WriteLine("  Make sure Ollama is running: ollama serve");
     Console.WriteLine($"  And pull a vision model: ollama pull {modelName}");
-    Console.WriteLine("  Levels 1-3 above ran successfully without Ollama.");
+    Console.WriteLine("  Levels 1-4 above ran successfully without Ollama.");
 }
 
 static async IAsyncEnumerable<T> ToAsync<T>(IEnumerable<T> source)

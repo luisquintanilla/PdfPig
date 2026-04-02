@@ -12,8 +12,8 @@ if (pdfPath is null || !File.Exists(pdfPath))
 }
 
 // Example 1: Basic reading (flat text, no layout analysis, no page images)
-Console.WriteLine("=== Basic Reading (renderPageImages: false) ===");
-var reader = new PdfPigReader(renderPageImages: false);
+Console.WriteLine("=== Basic Reading (TextOnly — default) ===");
+var reader = new PdfPigReader();
 using var stream = File.OpenRead(pdfPath);
 var document = await reader.ReadAsync(stream, pdfPath, "application/pdf");
 Console.WriteLine($"Sections: {document.Sections.Count}");
@@ -32,10 +32,10 @@ foreach (var section in document.Sections)
 }
 
 // Example 2: With HeuristicPageSegmenter + page images
-Console.WriteLine("\n=== Heuristic Layout (renderPageImages: true) ===");
+Console.WriteLine("\n=== Heuristic Layout (Hybrid — text + images) ===");
 var structuredReader = new PdfPigReader(
     segmenter: HeuristicPageSegmenter.Instance,
-    renderPageImages: true);
+    mode: PdfReadingMode.Hybrid);
 using var stream2 = File.OpenRead(pdfPath);
 var doc2 = await structuredReader.ReadAsync(stream2, pdfPath, "application/pdf");
 Console.WriteLine($"Sections: {doc2.Sections.Count}");

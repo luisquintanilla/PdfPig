@@ -23,7 +23,7 @@ if (pdfPath is null || !File.Exists(pdfPath))
 Console.WriteLine($"Reading PDF: {pdfPath}");
 var reader = new PdfPigReader(
     segmenter: HeuristicPageSegmenter.Instance,
-    renderPageImages: true);
+    mode: PdfReadingMode.Hybrid);
 
 using var stream = File.OpenRead(pdfPath);
 var document = await reader.ReadAsync(stream, pdfPath, "application/pdf");

@@ -21,15 +21,36 @@ For the vision and contextual enrichment processors you also need an `IChatClien
 ```csharp
 public PdfPigReader(
     IPageSegmenter? segmenter = null,
-    bool renderPageImages = true,
+    PdfReadingMode mode = PdfReadingMode.TextOnly,
     int renderDpi = 150)
 ```
 
-The optional `segmenter` parameter accepts any PdfPig page segmenter. If omitted it defaults to `DefaultPageSegmenter.Instance`. When `renderPageImages` is `true` (the default), each page is rendered to a PNG image at the specified `renderDpi` and attached to the section metadata (see [Page Image Rendering](#page-image-rendering) below). Other built-in segmenter options include:
+The optional `segmenter` parameter accepts any PdfPig page segmenter. If omitted it defaults to `DefaultPageSegmenter.Instance`. The `mode` parameter controls how pages are read and whether page images are rendered (see [Reading Modes](#reading-modes) below). The `renderDpi` controls the resolution of rendered page images when the mode includes rendering. Other built-in segmenter options include:
 
 + `HeuristicPageSegmenter.Instance`
 + `RecursiveXYCut` (see [Document Layout Analysis](https://github.com/UglyToad/PdfPig/wiki/Document-Layout-Analysis))
 + ONNX-based segmenters
+
+### Reading Modes ###
+
+The `PdfReadingMode` enum controls text extraction and page image rendering behavior:
+
+| Mode | Text Extraction | Page Images | Scanned-Page Placeholders | Best For |
+|------|----------------|-------------|--------------------------|----------|
+| `TextOnly` (default) | ✅ Native text extraction | ❌ No rendering | ❌ No placeholders | Fast text-only pipelines — lowest memory usage |
+| `Hybrid` | ✅ Native text extraction | ✅ Rendered at `renderDpi` | ✅ Placeholder for pages with no text | RAG pipelines with vision LLM enrichment (tables, OCR fallback) |
+| `VisionOnly` | ❌ Skips text extraction | ✅ Rendered at `renderDpi` | ✅ Placeholder for every page | Pure VLM processing — let the vision model handle all content |
+
+```csharp
+// Default — text only, no images
+var reader = new PdfPigReader();
+
+// Hybrid — text + page images + scanned-page placeholders
+var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
+
+// VisionOnly — skip text extraction, render every page as an image
+var reader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+```
 
 ### ReadAsync ###
 
@@ -75,7 +96,7 @@ Returns an `IngestionDocument` containing:
 
 ## Page Image Rendering ##
 
-`PdfPigReader` renders each page to a PNG image by default. The rendered images are stored in section metadata so that downstream vision processors can send actual page images to LLMs instead of text-only prompts.
+When `PdfReadingMode.Hybrid` or `PdfReadingMode.VisionOnly` is used, `PdfPigReader` renders each page to a PNG image at the specified `renderDpi`. The rendered images are stored in section metadata so that downstream vision processors can send actual page images to LLMs instead of text-only prompts.
 
 ### Metadata Keys ###
 
@@ -88,14 +109,17 @@ Returns an `IngestionDocument` containing:
 ### Controlling Page Rendering ###
 
 ```csharp
-// Page image rendering is enabled by default
+// Hybrid mode — text extraction + page images at 150 DPI
 var reader = new PdfPigReader(
     segmenter: HeuristicPageSegmenter.Instance,
-    renderPageImages: true,
+    mode: PdfReadingMode.Hybrid,
     renderDpi: 150);
 
-// Disable page images for text-only pipelines (faster, less memory)
-var lightReader = new PdfPigReader(renderPageImages: false);
+// VisionOnly mode — skip text extraction, render every page
+var visionReader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+
+// TextOnly mode (default) — no page images, fastest processing
+var lightReader = new PdfPigReader(mode: PdfReadingMode.TextOnly);
 ```
 
 ### Direct Page Rendering ###
@@ -171,8 +195,8 @@ Processors are added to an `IngestionPipeline<T>` via the `DocumentProcessors` a
 
     IChatClient chatClient = /* your IChatClient implementation */;
 
-    // Page images enabled by default — vision processors will use them
-    var reader = new PdfPigReader();
+    // Hybrid mode — text extraction + page images for vision processors
+    var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
 
     var pipeline = new IngestionPipeline<string>(reader, chunker, writer)
     {
@@ -206,10 +230,10 @@ The following example shows a complete pipeline that reads a PDF with heuristic 
         .GetChatClient("gpt-4o")
         .AsIChatClient();
 
-    // Create reader with heuristic page segmentation and page image rendering
+    // Create reader with heuristic page segmentation in Hybrid mode
     var reader = new PdfPigReader(
         segmenter: HeuristicPageSegmenter.Instance,
-        renderPageImages: true,
+        mode: PdfReadingMode.Hybrid,
         renderDpi: 150);
 
     // Build the pipeline — vision processors use page images automatically
@@ -230,13 +254,13 @@ The following example shows a complete pipeline that reads a PDF with heuristic 
 
 ## Scanned PDF Support ##
 
-`PdfPigReader` automatically detects scanned or image-only pages that contain no extractable text. When `renderPageImages` is enabled (the default), these pages receive a **placeholder element** — an `IngestionDocumentParagraph` with empty text and `Metadata["placeholder"] = true`.
+`PdfPigReader` automatically detects scanned or image-only pages that contain no extractable text. When `PdfReadingMode.Hybrid` is used, these pages receive a **placeholder element** — an `IngestionDocumentParagraph` with empty text and `Metadata["placeholder"] = true`. In `VisionOnly` mode, every page receives a placeholder since text extraction is skipped entirely.
 
 ### How It Works ###
 
 1. `PdfPigReader` calls `page.GetWords()`. For scanned pages this returns no words.
 2. The segmenter produces no text blocks, so no elements are created.
-3. If `renderPageImages` is `true` and the section has zero elements, a placeholder element is inserted with `Text = ""`, the correct `PageNumber`, and `Metadata["placeholder"] = true`.
+3. In `Hybrid` mode, if the section has zero elements, a placeholder element is inserted with `Text = ""`, the correct `PageNumber`, and `Metadata["placeholder"] = true`. In `VisionOnly` mode, a placeholder is always inserted for every page.
 4. The page image is still rendered and stored in `section.Metadata["page_image"]`.
 5. `VisionOcrEnricher` finds the placeholder (empty text), retrieves the page image from section metadata, and sends it to a vision LLM for OCR.
 6. The OCR result is stored in the placeholder's `Text` property and `Metadata["ocr_source"]` is set to `"vision_llm"`.
@@ -253,7 +277,7 @@ The following example shows a complete pipeline that reads a PDF with heuristic 
 
 No code changes are needed — placeholder creation and OCR enrichment happen automatically:
 
-    var reader = new PdfPigReader(renderPageImages: true);
+    var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
     using var stream = File.OpenRead("scanned-document.pdf");
 
     var doc = await reader.ReadAsync(stream, "scanned.pdf", "application/pdf");

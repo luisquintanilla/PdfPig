@@ -14,8 +14,10 @@ namespace UglyToad.PdfPig.Tests.DataIngestion;
 
 public class PdfPigReaderTests
 {
+    #region Default (TextOnly) mode
+
     [Fact]
-    public async Task ReadAsync_WithDefaultSegmenter_ReturnsDocumentWithSections()
+    public async Task ReadAsync_DefaultMode_ReturnsDocumentWithSections()
     {
         var reader = new PdfPigReader();
         var path = IntegrationHelpers.GetDocumentPath("data");
@@ -29,7 +31,7 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_SectionCountMatchesPageCount()
+    public async Task ReadAsync_DefaultMode_SectionCountMatchesPageCount()
     {
         var reader = new PdfPigReader();
         var path = IntegrationHelpers.GetDocumentPath("cat-genetics");
@@ -47,7 +49,7 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_SectionsContainCorrectPageNumbers()
+    public async Task ReadAsync_DefaultMode_SectionsContainCorrectPageNumbers()
     {
         var reader = new PdfPigReader();
         var path = IntegrationHelpers.GetDocumentPath("data");
@@ -62,7 +64,7 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_ParagraphsContainBoundingBoxMetadata()
+    public async Task ReadAsync_DefaultMode_ParagraphsContainBoundingBoxMetadata()
     {
         var reader = new PdfPigReader();
         var path = IntegrationHelpers.GetDocumentPath("data");
@@ -84,7 +86,7 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BoundingBoxValuesAreNumeric()
+    public async Task ReadAsync_DefaultMode_BoundingBoxValuesAreNumeric()
     {
         var reader = new PdfPigReader();
         var path = IntegrationHelpers.GetDocumentPath("data");
@@ -98,6 +100,42 @@ public class PdfPigReaderTests
         Assert.IsType<double>(element.Metadata["BoundingBox.Bottom"]);
         Assert.IsType<double>(element.Metadata["BoundingBox.Right"]);
         Assert.IsType<double>(element.Metadata["BoundingBox.Top"]);
+    }
+
+    [Fact]
+    public async Task ReadAsync_DefaultMode_ParagraphsHaveNonEmptyText()
+    {
+        var reader = new PdfPigReader();
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        var allElements = doc.EnumerateContent().ToList();
+
+        foreach (var element in allElements)
+        {
+            Assert.False(string.IsNullOrEmpty(element.Text),
+                "All paragraphs should have non-empty text (empty blocks are skipped).");
+        }
+    }
+
+    [Fact]
+    public async Task ReadAsync_DefaultMode_ParagraphPageNumbersMatchSectionPageNumbers()
+    {
+        var reader = new PdfPigReader();
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        foreach (var section in doc.Sections)
+        {
+            foreach (var element in section.Elements)
+            {
+                Assert.Equal(section.PageNumber, element.PageNumber);
+            }
+        }
     }
 
     [Fact]
@@ -140,28 +178,14 @@ public class PdfPigReaderTests
             () => reader.ReadAsync(stream, "data.pdf", "application/pdf", cts.Token));
     }
 
-    [Fact]
-    public async Task ReadAsync_ParagraphsHaveNonEmptyText()
-    {
-        var reader = new PdfPigReader();
-        var path = IntegrationHelpers.GetDocumentPath("data");
+    #endregion
 
-        using var stream = File.OpenRead(path);
-        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
-
-        var allElements = doc.EnumerateContent().ToList();
-
-        foreach (var element in allElements)
-        {
-            Assert.False(string.IsNullOrEmpty(element.Text),
-                "All paragraphs should have non-empty text (empty blocks are skipped).");
-        }
-    }
+    #region TextOnly mode
 
     [Fact]
-    public async Task ReadAsync_ParagraphPageNumbersMatchSectionPageNumbers()
+    public async Task ReadAsync_TextOnly_DoesNotStorePageImage()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.TextOnly);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
         using var stream = File.OpenRead(path);
@@ -169,17 +193,34 @@ public class PdfPigReaderTests
 
         foreach (var section in doc.Sections)
         {
-            foreach (var element in section.Elements)
-            {
-                Assert.Equal(section.PageNumber, element.PageNumber);
-            }
+            Assert.False(section.Metadata.ContainsKey("page_image"),
+                $"Section for page {section.PageNumber} should NOT contain page_image in TextOnly mode.");
+            Assert.False(section.Metadata.ContainsKey("page_width"));
+            Assert.False(section.Metadata.ContainsKey("page_height"));
         }
     }
 
     [Fact]
-    public async Task ReadAsync_DefaultRenderPageImages_StoresPageImageInSectionMetadata()
+    public async Task ReadAsync_TextOnly_BlankPage_NoPlaceholder()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.TextOnly);
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        Assert.Single(doc.Sections);
+        Assert.Empty(doc.Sections[0].Elements);
+    }
+
+    #endregion
+
+    #region Hybrid mode
+
+    [Fact]
+    public async Task ReadAsync_Hybrid_StoresPageImageInSectionMetadata()
+    {
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
         using var stream = File.OpenRead(path);
@@ -188,14 +229,14 @@ public class PdfPigReaderTests
         foreach (var section in doc.Sections)
         {
             Assert.True(section.Metadata.ContainsKey("page_image"),
-                $"Section for page {section.PageNumber} should contain page_image metadata.");
+                $"Section for page {section.PageNumber} should contain page_image in Hybrid mode.");
         }
     }
 
     [Fact]
-    public async Task ReadAsync_DefaultRenderPageImages_PageImageIsValidPng()
+    public async Task ReadAsync_Hybrid_PageImageIsValidPng()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
         using var stream = File.OpenRead(path);
@@ -214,9 +255,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_DefaultRenderPageImages_StoresPageDimensions()
+    public async Task ReadAsync_Hybrid_StoresPageDimensions()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
         using var stream = File.OpenRead(path);
@@ -230,27 +271,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_RenderPageImagesFalse_DoesNotStorePageImage()
+    public async Task ReadAsync_Hybrid_CustomDpi_ProducesValidDocument()
     {
-        var reader = new PdfPigReader(renderPageImages: false);
-        var path = IntegrationHelpers.GetDocumentPath("data");
-
-        using var stream = File.OpenRead(path);
-        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
-
-        foreach (var section in doc.Sections)
-        {
-            Assert.False(section.Metadata.ContainsKey("page_image"),
-                $"Section for page {section.PageNumber} should NOT contain page_image when rendering is disabled.");
-            Assert.False(section.Metadata.ContainsKey("page_width"));
-            Assert.False(section.Metadata.ContainsKey("page_height"));
-        }
-    }
-
-    [Fact]
-    public async Task ReadAsync_CustomDpi_ProducesValidDocument()
-    {
-        var reader = new PdfPigReader(renderPageImages: true, renderDpi: 72);
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid, renderDpi: 72);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
         using var stream = File.OpenRead(path);
@@ -266,11 +289,11 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task Constructor_WithAllParameters_ProducesValidDocument()
+    public async Task ReadAsync_Hybrid_WithAllParameters_ProducesValidDocument()
     {
         var reader = new PdfPigReader(
-            segmenter: DocumentLayoutAnalysis.PageSegmenter.RecursiveXYCut.Instance,
-            renderPageImages: true,
+            segmenter: RecursiveXYCut.Instance,
+            mode: PdfReadingMode.Hybrid,
             renderDpi: 200);
         var path = IntegrationHelpers.GetDocumentPath("data");
 
@@ -283,9 +306,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BlankPage_WithRenderImages_CreatesPlaceholderElement()
+    public async Task ReadAsync_Hybrid_BlankPage_CreatesPlaceholderElement()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var pdfBytes = CreateBlankPagePdf();
 
         using var stream = new MemoryStream(pdfBytes);
@@ -300,9 +323,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BlankPage_PlaceholderHasCorrectPageNumber()
+    public async Task ReadAsync_Hybrid_BlankPage_PlaceholderHasCorrectPageNumber()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var pdfBytes = CreateBlankPagePdf();
 
         using var stream = new MemoryStream(pdfBytes);
@@ -313,9 +336,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BlankPage_PlaceholderHasPlaceholderMetadata()
+    public async Task ReadAsync_Hybrid_BlankPage_PlaceholderHasPlaceholderMetadata()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var pdfBytes = CreateBlankPagePdf();
 
         using var stream = new MemoryStream(pdfBytes);
@@ -328,9 +351,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BlankPage_SectionStillHasPageImage()
+    public async Task ReadAsync_Hybrid_BlankPage_SectionStillHasPageImage()
     {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var pdfBytes = CreateBlankPagePdf();
 
         using var stream = new MemoryStream(pdfBytes);
@@ -344,22 +367,9 @@ public class PdfPigReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_BlankPage_RenderImagesFalse_NoPlaceholder()
+    public async Task ReadAsync_Hybrid_MixedPdf_OnlyBlankPagesGetPlaceholders()
     {
-        var reader = new PdfPigReader(renderPageImages: false);
-        var pdfBytes = CreateBlankPagePdf();
-
-        using var stream = new MemoryStream(pdfBytes);
-        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
-
-        Assert.Single(doc.Sections);
-        Assert.Empty(doc.Sections[0].Elements);
-    }
-
-    [Fact]
-    public async Task ReadAsync_MixedPdf_OnlyBlankPagesGetPlaceholders()
-    {
-        var reader = new PdfPigReader();
+        var reader = new PdfPigReader(mode: PdfReadingMode.Hybrid);
         var pdfBytes = CreateMixedPdf();
 
         using var stream = new MemoryStream(pdfBytes);
@@ -384,6 +394,86 @@ public class PdfPigReaderTests
         Assert.Equal(2, page2.Elements[0].PageNumber);
     }
 
+    #endregion
+
+    #region VisionOnly mode
+
+    [Fact]
+    public async Task ReadAsync_VisionOnly_EveryPageGetsPlaceholder()
+    {
+        var reader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        Assert.NotEmpty(doc.Sections);
+
+        foreach (var section in doc.Sections)
+        {
+            Assert.Single(section.Elements);
+            var element = section.Elements[0];
+            Assert.Equal(string.Empty, element.Text);
+            Assert.True(element.Metadata.ContainsKey("placeholder"));
+            Assert.Equal(true, element.Metadata["placeholder"]);
+        }
+    }
+
+    [Fact]
+    public async Task ReadAsync_VisionOnly_AllSectionsHavePageImage()
+    {
+        var reader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        foreach (var section in doc.Sections)
+        {
+            Assert.True(section.Metadata.ContainsKey("page_image"));
+            var imageBytes = section.Metadata["page_image"] as byte[];
+            Assert.NotNull(imageBytes);
+            Assert.True(imageBytes.Length > 0);
+        }
+    }
+
+    [Fact]
+    public async Task ReadAsync_VisionOnly_PlaceholderPageNumbersMatchSections()
+    {
+        var reader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        for (int i = 0; i < doc.Sections.Count; i++)
+        {
+            Assert.Equal(i + 1, doc.Sections[i].Elements[0].PageNumber);
+        }
+    }
+
+    [Fact]
+    public async Task ReadAsync_VisionOnly_SkipsTextExtraction()
+    {
+        // VisionOnly should produce placeholders even for PDFs with text
+        var reader = new PdfPigReader(mode: PdfReadingMode.VisionOnly);
+        var path = IntegrationHelpers.GetDocumentPath("data");
+
+        using var stream = File.OpenRead(path);
+        var doc = await reader.ReadAsync(stream, "data.pdf", "application/pdf");
+
+        // All elements should be placeholders with empty text — no native text extraction
+        foreach (var element in doc.EnumerateContent())
+        {
+            Assert.Equal(string.Empty, element.Text);
+            Assert.True(element.Metadata.ContainsKey("placeholder"));
+        }
+    }
+
+    #endregion
+
+    #region Helpers
+
     private static byte[] CreateBlankPagePdf()
     {
         using var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
@@ -402,5 +492,7 @@ public class PdfPigReaderTests
         builder.AddPage(Content.PageSize.A4);
         return builder.Build();
     }
+
+    #endregion
 }
 #endif
