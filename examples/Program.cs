@@ -51,7 +51,12 @@
                 8,
                     ("Extract Words with newline detection (example with algorithm). Issue 512",
                     () => OpenDocumentAndExtractWords.Run(Path.Combine(filesDirectory, "OPEN.RABBIT.ENGLISH.LOP.pdf")))
-                } 
+                },
+                {
+                9,
+                    ("Heuristic vs XY Cut layout segmentation comparison",
+                    () => HeuristicLayoutExample.Run(Path.Combine(filesDirectory, "ICML03-081.pdf")))
+                }
         };
 
             var choices = string.Join(Environment.NewLine, examples.Select(x => $"{x.Key}: {x.Value.name}"));

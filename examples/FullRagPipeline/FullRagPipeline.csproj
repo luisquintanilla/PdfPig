@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UglyToad.PdfPig\UglyToad.PdfPig.csproj" />
+    <ProjectReference Include="..\..\src\UglyToad.PdfPig.DocumentLayoutAnalysis\UglyToad.PdfPig.DocumentLayoutAnalysis.csproj" />
+    <ProjectReference Include="..\..\src\UglyToad.PdfPig.DataIngestion\UglyToad.PdfPig.DataIngestion.csproj" />
+  </ItemGroup>
+
+</Project>
