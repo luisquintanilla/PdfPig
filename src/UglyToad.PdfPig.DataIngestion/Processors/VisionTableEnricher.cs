@@ -1,6 +1,7 @@
 namespace UglyToad.PdfPig.DataIngestion.Processors
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Extensions.AI;
@@ -37,14 +38,50 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var prompt = "Extract the following table content into a well-formatted markdown table. " +
-                    "Only output the markdown table, no other text.\n\n" +
-                    table.GetMarkdown();
-
-                var messages = new[]
+                // Try to get page image for vision-based extraction
+                byte[]? imageBytes = null;
+                if (element.PageNumber is int pageNumber)
                 {
-                    new ChatMessage(ChatRole.User, prompt)
-                };
+                    foreach (var section in document.Sections)
+                    {
+                        if (section.PageNumber == pageNumber &&
+                            section.HasMetadata &&
+                            section.Metadata.TryGetValue("page_image", out var imageObj))
+                        {
+                            imageBytes = imageObj as byte[];
+                            break;
+                        }
+                    }
+                }
+
+                ChatMessage[] messages;
+                if (imageBytes is not null)
+                {
+                    // Vision approach: send actual page image
+                    messages = new[]
+                    {
+                        new ChatMessage(ChatRole.System,
+                            "You are a table extraction engine. Extract the table from the image as a markdown table. " +
+                            "Use | as column separators. Include a header separator (| --- | --- |). " +
+                            "Output ONLY the markdown table, nothing else."),
+                        new ChatMessage(ChatRole.User, (IList<AIContent>)new AIContent[]
+                        {
+                            new DataContent(imageBytes, "image/png"),
+                            new TextContent("Extract the table from this image as a markdown table.")
+                        })
+                    };
+                }
+                else
+                {
+                    // Fallback: text-based extraction
+                    messages = new[]
+                    {
+                        new ChatMessage(ChatRole.User,
+                            "Extract the following table content into a well-formatted markdown table. " +
+                            "Only output the markdown table, no other text.\n\n" +
+                            (table.Text ?? string.Empty))
+                    };
+                }
 
                 var response = await chatClient.GetResponseAsync(
                     messages,

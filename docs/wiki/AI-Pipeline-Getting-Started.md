@@ -49,11 +49,14 @@ foreach (var page in document.GetPages())
 }
 ```
 
+> **Tip:** At this level you're using PdfPig core directly (no DataIngestion). Page image rendering is a DataIngestion feature — see Level 4+.
+
 ### When to Use
 
 - You need raw text from a PDF with simple, single-column content.
 - You don't need to distinguish headings from body text.
 - Quick text dumps or full-text search indexing of simple documents.
+- Use `renderPageImages: false` if you later move to Level 4 but only need text extraction.
 
 ---
 
@@ -112,6 +115,7 @@ var blocks = segmenter.GetBlocks(words);
 - Single-column documents with headings (reports, letters, articles).
 - You want heading/body distinction without ML model overhead.
 - Fast, zero-dependency layout analysis.
+- Page image rendering is optional at this level — enable it in Level 4+ if you plan to use vision LLM processors.
 
 See [Document-Layout-Analysis § Heuristic Page Segmenter](Document-Layout-Analysis#heuristic-page-segmenter) for full details.
 
@@ -212,8 +216,11 @@ Install-Package UglyToad.PdfPig.DataIngestion
 using UglyToad.PdfPig.DataIngestion;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
-// Create reader with heuristic segmentation (or any IPageSegmenter)
-var reader = new PdfPigReader(segmenter: HeuristicPageSegmenter.Instance);
+// Create reader with page image rendering enabled for vision processor support
+var reader = new PdfPigReader(
+    segmenter: HeuristicPageSegmenter.Instance,
+    renderPageImages: true,
+    renderDpi: 150);
 using var stream = File.OpenRead("document.pdf");
 
 var doc = await reader.ReadAsync(stream, "document.pdf", "application/pdf");
@@ -221,6 +228,14 @@ var doc = await reader.ReadAsync(stream, "document.pdf", "application/pdf");
 foreach (var section in doc.Sections)
 {
     Console.WriteLine($"--- Page Section ---");
+
+    // Access the rendered page image if needed
+    if (section.Metadata.TryGetValue("page_image", out var imgObj))
+    {
+        byte[] pageImage = (byte[])imgObj;
+        Console.WriteLine($"  Page image: {pageImage.Length} bytes");
+    }
+
     foreach (var element in section.Elements)
     {
         Console.WriteLine(element.Text);
@@ -240,7 +255,8 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models;
 using var model = new RtDetrLayoutModel("heron_v2.onnx");
 using var segmenter = new OnnxPageSegmenter(model);
 
-var reader = new PdfPigReader(segmenter: segmenter);
+// Enable page images for downstream vision processors
+var reader = new PdfPigReader(segmenter: segmenter, renderPageImages: true);
 using var stream = File.OpenRead("document.pdf");
 
 var doc = await reader.ReadAsync(stream, "document.pdf", "application/pdf");
@@ -251,6 +267,8 @@ var doc = await reader.ReadAsync(stream, "document.pdf", "application/pdf");
 - You're building a RAG pipeline with MEDI as the orchestration layer.
 - You want structured `IngestionDocument` output that feeds into chunkers and vector stores.
 - You need a composable pipeline with pluggable segmenters.
+- Use `renderPageImages: true` (the default) if you plan to use vision LLM enrichment in Level 5.
+- Use `renderPageImages: false` for text-only pipelines where you want faster processing and lower memory usage.
 
 See [Data-Ingestion](Data-Ingestion) for full details.
 
@@ -282,19 +300,23 @@ using UglyToad.PdfPig.DataIngestion;
 using UglyToad.PdfPig.DataIngestion.Processors;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
-// Configure the chat client (e.g. Azure OpenAI)
+// Configure the chat client (e.g. Azure OpenAI with a vision-capable model)
 IChatClient chatClient = new OpenAI.OpenAIClient("your-api-key")
     .GetChatClient("gpt-4o")
     .AsIChatClient();
 
-// Create reader with heuristic page segmentation
-var reader = new PdfPigReader(segmenter: HeuristicPageSegmenter.Instance);
+// Create reader with page image rendering for vision processor support
+var reader = new PdfPigReader(
+    segmenter: HeuristicPageSegmenter.Instance,
+    renderPageImages: true,   // renders each page as PNG for vision LLMs
+    renderDpi: 150);
 
-// Build the pipeline with LLM processors
+// Build the pipeline with vision-enabled LLM processors
 var pipeline = new IngestionPipeline<string>(reader, chunker, writer)
 {
     DocumentProcessors =
     {
+        // Sends actual page images via DataContent to the LLM
         new VisionTableEnricher(chatClient),   // enrich tables → markdown
         new VisionOcrFallback(chatClient)       // OCR empty-text elements
     },
@@ -309,9 +331,9 @@ await pipeline.RunAsync("report.pdf");
 
 ### Processor Details
 
-**VisionTableEnricher** — For each `IngestionDocumentTable` element, sends the table region to a vision-capable LLM and stores the result in element metadata under the key `"enriched_markdown_table"`.
+**VisionTableEnricher** — For each `IngestionDocumentTable` element, sends the actual rendered page image (via MEAI's `DataContent(imageBytes, "image/png")` + `TextContent`) to a vision-capable LLM and stores the result in element metadata under the key `"enriched_markdown_table"`. Falls back to a text-based prompt if no page image is available.
 
-**VisionOcrFallback** — Elements with empty or whitespace-only text are sent to a vision LLM for OCR. Updates `element.Text` with the OCR result and sets metadata key `"ocr_source"` to `"vision_llm"`.
+**VisionOcrFallback** — Elements with empty or whitespace-only text are sent to a vision LLM for OCR using the rendered page image. Updates `element.Text` with the OCR result and sets metadata key `"ocr_source"` to `"vision_llm"`. Falls back to a text-only prompt if no page image is in section metadata.
 
 **ContextualChunkEnricher** — Generates a concise contextual summary for each text chunk. Stored in chunk metadata under the key `"contextual_summary"`. This improves search retrieval by adding semantic context.
 
@@ -320,6 +342,8 @@ await pipeline.RunAsync("report.pdf");
 - Your PDFs contain tables that need markdown representation for downstream LLM use.
 - You have scanned or image-heavy PDFs where text extraction yields empty content.
 - You want richer chunk metadata to improve vector search recall in RAG.
+- Levels 4+5 benefit from page image rendering (`renderPageImages: true`) for true vision LLM integration — the processors send multi-content messages with actual page images.
+- Use `renderPageImages: false` for text-only pipelines where speed and lower memory usage are priorities.
 
 See [Data-Ingestion § Processors](Data-Ingestion#processors) for full processor documentation.
 
@@ -332,8 +356,8 @@ See [Data-Ingestion § Processors](Data-Ingestion#processors) for full processor
 | 1 | `PdfPig` | Text extraction | Simple text dumps |
 | 2 | `PdfPig` | Heading/paragraph detection | Structured single-column docs |
 | 3 | `PdfPig` + `...Onnx` + ONNX Runtime | 17-class ML layout detection | Complex multi-region layouts |
-| 4 | `PdfPig` + `...DataIngestion` | MEDI pipeline reader | RAG pipeline ingestion |
-| 5 | `PdfPig` + `...DataIngestion` + `M.E.AI` | Table/OCR/context enrichment | Production RAG with LLMs |
+| 4 | `PdfPig` + `...DataIngestion` | MEDI pipeline reader + page images | RAG pipeline ingestion |
+| 5 | `PdfPig` + `...DataIngestion` + `M.E.AI` | Vision table/OCR/context enrichment | Production RAG with vision LLMs |
 
 ## See Also
 

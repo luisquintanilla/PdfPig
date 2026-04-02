@@ -13,6 +13,8 @@ namespace UglyToad.PdfPig.DataIngestion
     public class PdfPigReader : IngestionDocumentReader
     {
         private readonly IPageSegmenter segmenter;
+        private readonly bool renderPageImages;
+        private readonly int renderDpi;
 
         /// <summary>
         /// Creates a new <see cref="PdfPigReader"/>.
@@ -20,9 +22,17 @@ namespace UglyToad.PdfPig.DataIngestion
         /// <param name="segmenter">
         /// Page segmenter for layout analysis. Defaults to <see cref="DefaultPageSegmenter"/> if <see langword="null"/>.
         /// </param>
-        public PdfPigReader(IPageSegmenter? segmenter = null)
+        /// <param name="renderPageImages">
+        /// Whether to render each page as a PNG image and store it in section metadata. Defaults to <see langword="true"/>.
+        /// </param>
+        /// <param name="renderDpi">
+        /// The DPI to use when rendering page images. Defaults to 150.
+        /// </param>
+        public PdfPigReader(IPageSegmenter? segmenter = null, bool renderPageImages = true, int renderDpi = 150)
         {
             this.segmenter = segmenter ?? DefaultPageSegmenter.Instance;
+            this.renderPageImages = renderPageImages;
+            this.renderDpi = renderDpi;
         }
 
         /// <inheritdoc/>
@@ -46,6 +56,14 @@ namespace UglyToad.PdfPig.DataIngestion
                 {
                     PageNumber = i
                 };
+
+                if (renderPageImages)
+                {
+                    var imageBytes = PageImageRenderer.RenderPage(page, renderDpi);
+                    section.Metadata["page_image"] = imageBytes;
+                    section.Metadata["page_width"] = page.Width;
+                    section.Metadata["page_height"] = page.Height;
+                }
 
                 foreach (var block in blocks)
                 {

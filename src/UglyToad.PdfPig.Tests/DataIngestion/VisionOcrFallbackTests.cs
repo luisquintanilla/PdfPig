@@ -17,6 +17,8 @@ public class VisionOcrFallbackTests
     {
         private readonly string _response;
 
+        public List<ChatMessage> LastMessages { get; private set; } = new();
+
         public TestChatClient(string response) => _response = response;
 
         public Task<ChatResponse> GetResponseAsync(
@@ -25,6 +27,7 @@ public class VisionOcrFallbackTests
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            LastMessages = messages.ToList();
             var msg = new ChatMessage(ChatRole.Assistant, _response);
             return Task.FromResult(new ChatResponse(msg));
         }
@@ -200,6 +203,47 @@ public class VisionOcrFallbackTests
             // Text was set by OCR
             Assert.Equal(ocrText, element.Text);
         }
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithPageImage_SendsDataContentToLlm()
+    {
+        var ocrText = "Vision OCR result";
+        var client = new TestChatClient(ocrText);
+        var fallback = new VisionOcrFallback(client);
+
+        var fakeImageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var doc = new IngestionDocument("test.pdf");
+        var section = new IngestionDocumentSection { PageNumber = 1 };
+        section.Metadata["page_image"] = fakeImageBytes;
+        var emptyParagraph = new IngestionDocumentParagraph("image region") { Text = "", PageNumber = 1 };
+        section.Elements.Add(emptyParagraph);
+        doc.Sections.Add(section);
+
+        await fallback.ProcessAsync(doc);
+
+        var userMsg = client.LastMessages.Last(m => m.Role == ChatRole.User);
+        Assert.Contains(userMsg.Contents, c => c is DataContent dc && dc.MediaType == "image/png");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithoutPageImage_SendsTextOnlyToLlm()
+    {
+        var ocrText = "Text fallback OCR result";
+        var client = new TestChatClient(ocrText);
+        var fallback = new VisionOcrFallback(client);
+
+        var doc = new IngestionDocument("test.pdf");
+        var section = new IngestionDocumentSection { PageNumber = 1 };
+        // No page_image metadata
+        var emptyParagraph = new IngestionDocumentParagraph("image region") { Text = "", PageNumber = 1 };
+        section.Elements.Add(emptyParagraph);
+        doc.Sections.Add(section);
+
+        await fallback.ProcessAsync(doc);
+
+        var userMsg = client.LastMessages.Last(m => m.Role == ChatRole.User);
+        Assert.DoesNotContain(userMsg.Contents, c => c is DataContent);
     }
 
     private static IngestionDocument CreateDocumentWithEmptyTextElement()

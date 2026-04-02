@@ -17,6 +17,8 @@ public class VisionTableEnricherTests
     {
         private readonly string _response;
 
+        public List<ChatMessage> LastMessages { get; private set; } = new();
+
         public TestChatClient(string response) => _response = response;
 
         public Task<ChatResponse> GetResponseAsync(
@@ -25,6 +27,7 @@ public class VisionTableEnricherTests
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            LastMessages = messages.ToList();
             var msg = new ChatMessage(ChatRole.Assistant, _response);
             return Task.FromResult(new ChatResponse(msg));
         }
@@ -167,6 +170,51 @@ public class VisionTableEnricherTests
         var result = await enricher.ProcessAsync(doc);
 
         Assert.Same(doc, result);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithPageImage_SendsDataContentToLlm()
+    {
+        var expectedMarkdown = "| A | B |";
+        var client = new TestChatClient(expectedMarkdown);
+        var enricher = new VisionTableEnricher(client);
+
+        var fakeImageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var doc = new IngestionDocument("test.pdf");
+        var section = new IngestionDocumentSection { PageNumber = 1 };
+        section.Metadata["page_image"] = fakeImageBytes;
+
+        var table = CreateTable("| raw | data |");
+        table.PageNumber = 1;
+        section.Elements.Add(table);
+        doc.Sections.Add(section);
+
+        await enricher.ProcessAsync(doc);
+
+        var userMsg = client.LastMessages.Last(m => m.Role == ChatRole.User);
+        Assert.Contains(userMsg.Contents, c => c is DataContent dc && dc.MediaType == "image/png");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithoutPageImage_SendsTextOnlyToLlm()
+    {
+        var expectedMarkdown = "| A | B |";
+        var client = new TestChatClient(expectedMarkdown);
+        var enricher = new VisionTableEnricher(client);
+
+        var doc = new IngestionDocument("test.pdf");
+        var section = new IngestionDocumentSection { PageNumber = 1 };
+        // No page_image metadata
+
+        var table = CreateTable("| raw | data |");
+        table.PageNumber = 1;
+        section.Elements.Add(table);
+        doc.Sections.Add(section);
+
+        await enricher.ProcessAsync(doc);
+
+        var userMsg = client.LastMessages.Last(m => m.Role == ChatRole.User);
+        Assert.DoesNotContain(userMsg.Contents, c => c is DataContent);
     }
 
     private static IngestionDocument CreateDocumentWithTable()
