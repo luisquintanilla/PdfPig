@@ -29,67 +29,92 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
         public override async Task<IngestionDocument> ProcessAsync(
             IngestionDocument document, CancellationToken cancellationToken = default)
         {
-            foreach (var element in document.EnumerateContent())
+            // Iterate by index so we can replace elements in-place.
+            // This is necessary because the MEDI chunker uses GetMarkdown() (which returns
+            // the immutable constructor parameter) rather than element.Text. Setting Text alone
+            // would leave stale placeholder content in GetMarkdown(), causing the chunker to
+            // produce chunks with placeholder text instead of the OCR'd content.
+            foreach (var section in document.Sections)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!string.IsNullOrWhiteSpace(element.Text))
+                for (int i = 0; i < section.Elements.Count; i++)
                 {
-                    continue;
-                }
+                    var element = section.Elements[i];
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                // Try to get page image for vision-based OCR
-                byte[]? imageBytes = null;
-                if (element.PageNumber is int pageNumber)
-                {
-                    foreach (var section in document.Sections)
+                    if (!string.IsNullOrWhiteSpace(element.Text))
                     {
-                        if (section.PageNumber == pageNumber &&
-                            section.HasMetadata &&
-                            section.Metadata.TryGetValue("page_image", out var imageObj))
+                        continue;
+                    }
+
+                    // Try to get page image for vision-based OCR
+                    byte[]? imageBytes = null;
+                    if (element.PageNumber is int pageNumber)
+                    {
+                        foreach (var s in document.Sections)
                         {
-                            imageBytes = imageObj as byte[];
-                            break;
+                            if (s.PageNumber == pageNumber &&
+                                s.HasMetadata &&
+                                s.Metadata.TryGetValue("page_image", out var imageObj))
+                            {
+                                imageBytes = imageObj as byte[];
+                                break;
+                            }
                         }
                     }
-                }
 
-                ChatMessage[] messages;
-                if (imageBytes is not null)
-                {
-                    // Vision approach: send actual page image
-                    messages = new[]
+                    ChatMessage[] messages;
+                    if (imageBytes is not null)
                     {
-                        new ChatMessage(ChatRole.System,
-                            "You are a precise OCR engine. Extract all visible text from the provided image exactly as it appears. " +
-                            "Preserve line breaks and formatting. Output only the extracted text, no commentary."),
-                        new ChatMessage(ChatRole.User, (IList<AIContent>)new AIContent[]
+                        // Vision approach: send actual page image
+                        messages = new[]
                         {
-                            new DataContent(imageBytes, "image/png"),
-                            new TextContent("Extract all text from this image.")
-                        })
-                    };
-                }
-                else
-                {
-                    // Fallback: text-based approach when no image available
-                    messages = new[]
+                            new ChatMessage(ChatRole.System,
+                                "You are a precise OCR engine. Extract all visible text from the provided image exactly as it appears. " +
+                                "Preserve line breaks and formatting. Output only the extracted text, no commentary."),
+                            new ChatMessage(ChatRole.User, (IList<AIContent>)new AIContent[]
+                            {
+                                new DataContent(imageBytes, "image/png"),
+                                new TextContent("Extract all text from this image.")
+                            })
+                        };
+                    }
+                    else
                     {
-                        new ChatMessage(ChatRole.User,
-                            "You are an OCR engine. Extract all visible text from the following content. " +
-                            "Return only the extracted text, preserving the original layout as much as possible.\n\n" +
-                            (element.Text ?? string.Empty))
-                    };
-                }
+                        // Fallback: text-based approach when no image available
+                        messages = new[]
+                        {
+                            new ChatMessage(ChatRole.User,
+                                "You are an OCR engine. Extract all visible text from the following content. " +
+                                "Return only the extracted text, preserving the original layout as much as possible.\n\n" +
+                                (element.Text ?? string.Empty))
+                        };
+                    }
 
-                var response = await chatClient.GetResponseAsync(
-                    messages,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                    var response = await chatClient.GetResponseAsync(
+                        messages,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                if (!string.IsNullOrWhiteSpace(response.Text))
-                {
-                    element.Text = response.Text;
-                    element.Metadata["ocr_source"] = "vision_llm";
+                    if (!string.IsNullOrWhiteSpace(response.Text))
+                    {
+                        // Replace the element with a new one whose markdown (constructor param)
+                        // contains the OCR text, so downstream chunkers see it via GetMarkdown().
+                        var replacement = new IngestionDocumentParagraph(response.Text)
+                        {
+                            Text = response.Text,
+                            PageNumber = element.PageNumber
+                        };
+
+                        if (element.HasMetadata)
+                        {
+                            foreach (var kv in element.Metadata)
+                            {
+                                replacement.Metadata[kv.Key] = kv.Value;
+                            }
+                        }
+
+                        replacement.Metadata["ocr_source"] = "vision_llm";
+                        section.Elements[i] = replacement;
+                    }
                 }
             }
 
