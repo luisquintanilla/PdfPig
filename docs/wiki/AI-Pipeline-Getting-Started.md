@@ -335,6 +335,8 @@ await pipeline.RunAsync("report.pdf");
 
 **VisionOcrEnricher** — Elements with empty or whitespace-only text are sent to a vision LLM for OCR using the rendered page image. Updates `element.Text` with the OCR result and sets metadata key `"ocr_source"` to `"vision_llm"`. Falls back to a text-only prompt if no page image is in section metadata.
 
+> **Scanned PDF support:** `PdfPigReader` automatically creates placeholder elements (with `Metadata["placeholder"] = true`) for pages that have no extractable text when `renderPageImages` is enabled. This ensures `VisionOcrEnricher` can process scanned/image-only pages via vision LLM OCR — no additional configuration needed. See [Data-Ingestion § Scanned PDF Support](Data-Ingestion#scanned-pdf-support) for details.
+
 **ContextualChunkEnricher** — Generates a concise contextual summary for each text chunk. Stored in chunk metadata under the key `"contextual_summary"`. This improves search retrieval by adding semantic context.
 
 ### When to Use

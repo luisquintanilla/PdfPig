@@ -246,6 +246,39 @@ public class VisionOcrEnricherTests
         Assert.DoesNotContain(userMsg.Contents, c => c is DataContent);
     }
 
+    [Fact]
+    public async Task ProcessAsync_PlaceholderElement_WithPageImage_PerformsVisionOcr()
+    {
+        var ocrText = "Text extracted from scanned page image";
+        var client = new TestChatClient(ocrText);
+        var enricher = new VisionOcrEnricher(client);
+
+        // Simulate what PdfPigReader produces for a scanned page
+        var fakeImageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var doc = new IngestionDocument("scanned.pdf");
+        var section = new IngestionDocumentSection { PageNumber = 1 };
+        section.Metadata["page_image"] = fakeImageBytes;
+
+        var placeholder = new IngestionDocumentParagraph("[scanned-page]")
+        {
+            Text = string.Empty,
+            PageNumber = 1
+        };
+        placeholder.Metadata["placeholder"] = true;
+        section.Elements.Add(placeholder);
+        doc.Sections.Add(section);
+
+        var result = await enricher.ProcessAsync(doc);
+
+        var element = result.EnumerateContent().First();
+        Assert.Equal(ocrText, element.Text);
+        Assert.Equal("vision_llm", element.Metadata["ocr_source"]);
+
+        // Verify vision approach was used (DataContent with image)
+        var userMsg = client.LastMessages.Last(m => m.Role == ChatRole.User);
+        Assert.Contains(userMsg.Contents, c => c is DataContent dc && dc.MediaType == "image/png");
+    }
+
     private static IngestionDocument CreateDocumentWithEmptyTextElement()
     {
         var doc = new IngestionDocument("test.pdf");

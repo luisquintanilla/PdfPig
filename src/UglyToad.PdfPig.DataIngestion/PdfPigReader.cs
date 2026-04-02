@@ -87,6 +87,20 @@ namespace UglyToad.PdfPig.DataIngestion
                     section.Elements.Add(paragraph);
                 }
 
+                // For scanned/image-only pages with no extractable text,
+                // create a placeholder element so VisionOcrEnricher can
+                // process the page image via vision LLM OCR.
+                if (section.Elements.Count == 0 && renderPageImages)
+                {
+                    var placeholder = new IngestionDocumentParagraph("[scanned-page]")
+                    {
+                        Text = string.Empty,
+                        PageNumber = i
+                    };
+                    placeholder.Metadata["placeholder"] = true;
+                    section.Elements.Add(placeholder);
+                }
+
                 document.Sections.Add(section);
             }
 

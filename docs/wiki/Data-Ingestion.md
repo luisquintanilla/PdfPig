@@ -228,6 +228,47 @@ The following example shows a complete pipeline that reads a PDF with heuristic 
 
     await pipeline.RunAsync("report.pdf");
 
+## Scanned PDF Support ##
+
+`PdfPigReader` automatically detects scanned or image-only pages that contain no extractable text. When `renderPageImages` is enabled (the default), these pages receive a **placeholder element** — an `IngestionDocumentParagraph` with empty text and `Metadata["placeholder"] = true`.
+
+### How It Works ###
+
+1. `PdfPigReader` calls `page.GetWords()`. For scanned pages this returns no words.
+2. The segmenter produces no text blocks, so no elements are created.
+3. If `renderPageImages` is `true` and the section has zero elements, a placeholder element is inserted with `Text = ""`, the correct `PageNumber`, and `Metadata["placeholder"] = true`.
+4. The page image is still rendered and stored in `section.Metadata["page_image"]`.
+5. `VisionOcrEnricher` finds the placeholder (empty text), retrieves the page image from section metadata, and sends it to a vision LLM for OCR.
+6. The OCR result is stored in the placeholder's `Text` property and `Metadata["ocr_source"]` is set to `"vision_llm"`.
+
+### Pipeline Flow ###
+
+| Page Type | GetWords() | Placeholder? | VisionOcrEnricher |
+|-----------|-----------|-------------|-------------------|
+| Digital (has text) | Returns words | No (elements already exist) | Skips (text present) |
+| Scanned (image-only) | Empty | Yes | Processes via vision LLM OCR |
+| Mixed PDF | Per-page | Only blank pages | Only blank pages |
+
+### Example ###
+
+No code changes are needed — placeholder creation and OCR enrichment happen automatically:
+
+    var reader = new PdfPigReader(renderPageImages: true);
+    using var stream = File.OpenRead("scanned-document.pdf");
+
+    var doc = await reader.ReadAsync(stream, "scanned.pdf", "application/pdf");
+
+    // Placeholders are created for scanned pages — enrich them with VisionOcrEnricher
+    IChatClient chatClient = /* your vision-capable IChatClient */;
+    var ocrEnricher = new VisionOcrEnricher(chatClient);
+    doc = await ocrEnricher.ProcessAsync(doc);
+
+    // Now all pages have text — both digital and OCR'd scanned pages
+    foreach (var element in doc.EnumerateContent())
+    {
+        Console.WriteLine(element.Text);
+    }
+
 ## See Also ##
 
 + [Document Layout Analysis](https://github.com/UglyToad/PdfPig/wiki/Document-Layout-Analysis) — details on page segmenters

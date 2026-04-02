@@ -281,5 +281,126 @@ public class PdfPigReaderTests
         Assert.NotEmpty(doc.Sections);
         Assert.True(doc.Sections[0].Metadata.ContainsKey("page_image"));
     }
+
+    [Fact]
+    public async Task ReadAsync_BlankPage_WithRenderImages_CreatesPlaceholderElement()
+    {
+        var reader = new PdfPigReader();
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        Assert.Single(doc.Sections);
+        var section = doc.Sections[0];
+        Assert.Single(section.Elements);
+
+        var element = section.Elements[0];
+        Assert.Equal(string.Empty, element.Text);
+    }
+
+    [Fact]
+    public async Task ReadAsync_BlankPage_PlaceholderHasCorrectPageNumber()
+    {
+        var reader = new PdfPigReader();
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        var element = doc.Sections[0].Elements[0];
+        Assert.Equal(1, element.PageNumber);
+    }
+
+    [Fact]
+    public async Task ReadAsync_BlankPage_PlaceholderHasPlaceholderMetadata()
+    {
+        var reader = new PdfPigReader();
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        var element = doc.Sections[0].Elements[0];
+        Assert.True(element.HasMetadata);
+        Assert.True(element.Metadata.ContainsKey("placeholder"));
+        Assert.Equal(true, element.Metadata["placeholder"]);
+    }
+
+    [Fact]
+    public async Task ReadAsync_BlankPage_SectionStillHasPageImage()
+    {
+        var reader = new PdfPigReader();
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        var section = doc.Sections[0];
+        Assert.True(section.Metadata.ContainsKey("page_image"));
+        var imageBytes = section.Metadata["page_image"] as byte[];
+        Assert.NotNull(imageBytes);
+        Assert.True(imageBytes.Length > 0);
+    }
+
+    [Fact]
+    public async Task ReadAsync_BlankPage_RenderImagesFalse_NoPlaceholder()
+    {
+        var reader = new PdfPigReader(renderPageImages: false);
+        var pdfBytes = CreateBlankPagePdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "blank.pdf", "application/pdf");
+
+        Assert.Single(doc.Sections);
+        Assert.Empty(doc.Sections[0].Elements);
+    }
+
+    [Fact]
+    public async Task ReadAsync_MixedPdf_OnlyBlankPagesGetPlaceholders()
+    {
+        var reader = new PdfPigReader();
+        var pdfBytes = CreateMixedPdf();
+
+        using var stream = new MemoryStream(pdfBytes);
+        var doc = await reader.ReadAsync(stream, "mixed.pdf", "application/pdf");
+
+        Assert.Equal(2, doc.Sections.Count);
+
+        // Page 1 has text — should have normal elements, no placeholder
+        var page1 = doc.Sections[0];
+        Assert.NotEmpty(page1.Elements);
+        foreach (var el in page1.Elements)
+        {
+            Assert.False(string.IsNullOrEmpty(el.Text));
+            Assert.False(el.Metadata.ContainsKey("placeholder"));
+        }
+
+        // Page 2 is blank — should have single placeholder
+        var page2 = doc.Sections[1];
+        Assert.Single(page2.Elements);
+        Assert.Equal(string.Empty, page2.Elements[0].Text);
+        Assert.True(page2.Elements[0].Metadata.ContainsKey("placeholder"));
+        Assert.Equal(2, page2.Elements[0].PageNumber);
+    }
+
+    private static byte[] CreateBlankPagePdf()
+    {
+        using var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
+        builder.AddPage(Content.PageSize.A4);
+        return builder.Build();
+    }
+
+    private static byte[] CreateMixedPdf()
+    {
+        using var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
+        // Page 1: has text
+        var page1 = builder.AddPage(Content.PageSize.A4);
+        var font = builder.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        page1.AddText("Hello World", 12, new UglyToad.PdfPig.Core.PdfPoint(72, 720), font);
+        // Page 2: blank (no text)
+        builder.AddPage(Content.PageSize.A4);
+        return builder.Build();
+    }
 }
 #endif
