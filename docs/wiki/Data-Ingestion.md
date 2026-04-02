@@ -132,17 +132,17 @@ For each `IngestionDocumentTable` element, the enricher stores the LLM response 
 
 When a page image is available in `section.Metadata["page_image"]`, the enricher sends the actual image to the LLM via MEAI's `DataContent(imageBytes, "image/png")` alongside a `TextContent` prompt — enabling true vision-based table extraction. If no page image is present, it gracefully falls back to a text-based prompt.
 
-### VisionOcrFallback ###
+### VisionOcrEnricher ###
 
-`VisionOcrFallback` is an `IngestionDocumentProcessor` that acts as a fallback for scanned pages or image-heavy regions. Elements with empty or whitespace-only text are sent to a vision LLM for OCR.
+`VisionOcrEnricher` is an `IngestionDocumentProcessor` that acts as a fallback for scanned pages or image-heavy regions. Elements with empty or whitespace-only text are sent to a vision LLM for OCR.
 
 ```csharp
-public VisionOcrFallback(IChatClient chatClient)
+public VisionOcrEnricher(IChatClient chatClient)
 ```
 
 When the LLM returns text, the processor updates `element.Text` with the OCR result and sets the metadata key `"ocr_source"` to `"vision_llm"`.
 
-When a page image is available in section metadata, `VisionOcrFallback` sends the rendered page image via `DataContent(imageBytes, "image/png")` combined with `TextContent` for true vision OCR. If no page image is present, it falls back to a text-only prompt describing the region.
+When a page image is available in section metadata, `VisionOcrEnricher` sends the rendered page image via `DataContent(imageBytes, "image/png")` combined with `TextContent` for true vision OCR. If no page image is present, it falls back to a text-only prompt describing the region.
 
 ### ContextualChunkEnricher ###
 
@@ -179,7 +179,7 @@ Processors are added to an `IngestionPipeline<T>` via the `DocumentProcessors` a
         DocumentProcessors =
         {
             new VisionTableEnricher(chatClient),
-            new VisionOcrFallback(chatClient)
+            new VisionOcrEnricher(chatClient)
         },
         ChunkProcessors =
         {
@@ -189,7 +189,7 @@ Processors are added to an `IngestionPipeline<T>` via the `DocumentProcessors` a
 
     await pipeline.RunAsync("document.pdf");
 
-Document processors run in the order they are added, so `VisionTableEnricher` enriches tables before `VisionOcrFallback` handles any remaining empty-text elements. Chunk processors run after chunking. Both vision processors automatically use page images from section metadata when available, sending multi-content messages (`DataContent` + `TextContent`) to the LLM.
+Document processors run in the order they are added, so `VisionTableEnricher` enriches tables before `VisionOcrEnricher` handles any remaining empty-text elements. Chunk processors run after chunking. Both vision processors automatically use page images from section metadata when available, sending multi-content messages (`DataContent` + `TextContent`) to the LLM.
 
 ## Full Example ##
 
@@ -218,7 +218,7 @@ The following example shows a complete pipeline that reads a PDF with heuristic 
         DocumentProcessors =
         {
             new VisionTableEnricher(chatClient),
-            new VisionOcrFallback(chatClient)
+            new VisionOcrEnricher(chatClient)
         },
         ChunkProcessors =
         {

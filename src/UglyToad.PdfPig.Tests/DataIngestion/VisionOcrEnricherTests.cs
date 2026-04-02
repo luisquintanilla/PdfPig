@@ -11,7 +11,7 @@ using Xunit;
 
 namespace UglyToad.PdfPig.Tests.DataIngestion;
 
-public class VisionOcrFallbackTests
+public class VisionOcrEnricherTests
 {
     private class TestChatClient : IChatClient
     {
@@ -46,7 +46,7 @@ public class VisionOcrFallbackTests
     [Fact]
     public void Constructor_NullChatClient_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => new VisionOcrFallback(null!));
+        Assert.Throws<ArgumentNullException>(() => new VisionOcrEnricher(null!));
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class VisionOcrFallbackTests
     {
         var ocrText = "Extracted OCR text from image";
         var client = new TestChatClient(ocrText);
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = CreateDocumentWithEmptyTextElement();
 
@@ -68,7 +68,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_EmptyTextElement_SetsOcrSourceMetadata()
     {
         var client = new TestChatClient("OCR result");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = CreateDocumentWithEmptyTextElement();
 
@@ -83,7 +83,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_ElementWithText_NotModified()
     {
         var client = new TestChatClient("Should not replace");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = new IngestionDocument("test.pdf");
         var section = new IngestionDocumentSection { PageNumber = 1 };
@@ -103,7 +103,7 @@ public class VisionOcrFallbackTests
     {
         var ocrText = "Extracted text";
         var client = new TestChatClient(ocrText);
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = new IngestionDocument("test.pdf");
         var section = new IngestionDocumentSection { PageNumber = 1 };
@@ -129,7 +129,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_EmptyDocument_NoException()
     {
         var client = new TestChatClient("response");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = new IngestionDocument("empty.pdf");
 
@@ -142,7 +142,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_LlmReturnsWhitespace_ElementNotModified()
     {
         var client = new TestChatClient("   ");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = CreateDocumentWithEmptyTextElement();
 
@@ -157,7 +157,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_CancellationRequested_Throws()
     {
         var client = new TestChatClient("response");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = CreateDocumentWithEmptyTextElement();
         using var cts = new CancellationTokenSource();
@@ -171,7 +171,7 @@ public class VisionOcrFallbackTests
     public async Task ProcessAsync_ReturnsSameDocumentInstance()
     {
         var client = new TestChatClient("ocr text");
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = CreateDocumentWithEmptyTextElement();
 
@@ -185,7 +185,7 @@ public class VisionOcrFallbackTests
     {
         var ocrText = "OCR from null text";
         var client = new TestChatClient(ocrText);
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = new IngestionDocument("test.pdf");
         var section = new IngestionDocumentSection { PageNumber = 1 };
@@ -210,7 +210,7 @@ public class VisionOcrFallbackTests
     {
         var ocrText = "Vision OCR result";
         var client = new TestChatClient(ocrText);
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var fakeImageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
         var doc = new IngestionDocument("test.pdf");
@@ -231,7 +231,7 @@ public class VisionOcrFallbackTests
     {
         var ocrText = "Text fallback OCR result";
         var client = new TestChatClient(ocrText);
-        var fallback = new VisionOcrFallback(client);
+        var fallback = new VisionOcrEnricher(client);
 
         var doc = new IngestionDocument("test.pdf");
         var section = new IngestionDocumentSection { PageNumber = 1 };

@@ -281,7 +281,7 @@ See [Data-Ingestion](Data-Ingestion) for full details.
 | Processor | Type | Purpose |
 |-----------|------|---------|
 | `VisionTableEnricher` | `IngestionDocumentProcessor` | Sends table elements to a vision LLM to extract well-formatted markdown tables |
-| `VisionOcrFallback` | `IngestionDocumentProcessor` | Falls back to a vision LLM for OCR on elements with empty text (scanned pages) |
+| `VisionOcrEnricher` | `IngestionDocumentProcessor` | Falls back to a vision LLM for OCR on elements with empty text (scanned pages) |
 | `ContextualChunkEnricher` | `IngestionChunkProcessor<string>` | Generates a contextual summary for each chunk to improve retrieval quality |
 
 ### NuGet Packages
@@ -318,7 +318,7 @@ var pipeline = new IngestionPipeline<string>(reader, chunker, writer)
     {
         // Sends actual page images via DataContent to the LLM
         new VisionTableEnricher(chatClient),   // enrich tables → markdown
-        new VisionOcrFallback(chatClient)       // OCR empty-text elements
+        new VisionOcrEnricher(chatClient)       // OCR empty-text elements
     },
     ChunkProcessors =
     {
@@ -333,7 +333,7 @@ await pipeline.RunAsync("report.pdf");
 
 **VisionTableEnricher** — For each `IngestionDocumentTable` element, sends the actual rendered page image (via MEAI's `DataContent(imageBytes, "image/png")` + `TextContent`) to a vision-capable LLM and stores the result in element metadata under the key `"enriched_markdown_table"`. Falls back to a text-based prompt if no page image is available.
 
-**VisionOcrFallback** — Elements with empty or whitespace-only text are sent to a vision LLM for OCR using the rendered page image. Updates `element.Text` with the OCR result and sets metadata key `"ocr_source"` to `"vision_llm"`. Falls back to a text-only prompt if no page image is in section metadata.
+**VisionOcrEnricher** — Elements with empty or whitespace-only text are sent to a vision LLM for OCR using the rendered page image. Updates `element.Text` with the OCR result and sets metadata key `"ocr_source"` to `"vision_llm"`. Falls back to a text-only prompt if no page image is in section metadata.
 
 **ContextualChunkEnricher** — Generates a concise contextual summary for each text chunk. Stored in chunk metadata under the key `"contextual_summary"`. This improves search retrieval by adding semantic context.
 

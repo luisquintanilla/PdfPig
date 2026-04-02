@@ -8,19 +8,19 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
     using Microsoft.Extensions.DataIngestion;
 
     /// <summary>
-    /// Falls back to vision LLM-based OCR for document elements that have minimal or no text content,
-    /// such as scanned pages or image-heavy regions.
+    /// Enriches document elements that have minimal or no text content by performing
+    /// vision LLM-based OCR, such as for scanned pages or image-heavy regions.
     /// </summary>
-    public class VisionOcrFallback : IngestionDocumentProcessor
+    public class VisionOcrEnricher : IngestionDocumentProcessor
     {
         private readonly IChatClient chatClient;
 
         /// <summary>
-        /// Creates a new <see cref="VisionOcrFallback"/>.
+        /// Creates a new <see cref="VisionOcrEnricher"/>.
         /// </summary>
         /// <param name="chatClient">The chat client used to interact with a vision-capable LLM.</param>
         /// <exception cref="ArgumentNullException"><paramref name="chatClient"/> is <see langword="null"/>.</exception>
-        public VisionOcrFallback(IChatClient chatClient)
+        public VisionOcrEnricher(IChatClient chatClient)
         {
             this.chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         }

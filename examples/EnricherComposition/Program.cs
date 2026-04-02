@@ -1,4 +1,4 @@
-﻿// Enricher Composition Example
+// Enricher Composition Example
 // Demonstrates composing multiple PdfPig vision processors with a real Ollama backend.
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DataIngestion;
@@ -51,9 +51,9 @@ try
     };
     IChatClient chatClient = new OllamaSharp.OllamaApiClient(httpClient, modelName);
 
-    // --- Pattern 1: VisionOcrFallback ---
-    Console.WriteLine($"\nApplying VisionOcrFallback (model: {modelName})...");
-    var ocrProcessor = new VisionOcrFallback(chatClient);
+    // --- Pattern 1: VisionOcrEnricher ---
+    Console.WriteLine($"\nApplying VisionOcrEnricher (model: {modelName})...");
+    var ocrProcessor = new VisionOcrEnricher(chatClient);
     document = await ocrProcessor.ProcessAsync(document);
 
     var ocrCount = document.EnumerateContent()

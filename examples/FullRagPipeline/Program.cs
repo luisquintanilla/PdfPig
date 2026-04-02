@@ -1,4 +1,4 @@
-﻿// Full RAG Pipeline Example
+// Full RAG Pipeline Example
 // Demonstrates progressive levels of document understanding with real code.
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DataIngestion;
@@ -119,9 +119,9 @@ try
     IChatClient chatClient = new OllamaSharp.OllamaApiClient(httpClient, modelName);
     Console.WriteLine($"  Using model: {modelName} at {ollamaEndpoint}");
 
-    // Apply VisionOcrFallback
-    Console.WriteLine("  Applying VisionOcrFallback...");
-    doc3 = await new VisionOcrFallback(chatClient).ProcessAsync(doc3);
+    // Apply VisionOcrEnricher
+    Console.WriteLine("  Applying VisionOcrEnricher...");
+    doc3 = await new VisionOcrEnricher(chatClient).ProcessAsync(doc3);
 
     // Apply VisionTableEnricher
     Console.WriteLine("  Applying VisionTableEnricher...");
