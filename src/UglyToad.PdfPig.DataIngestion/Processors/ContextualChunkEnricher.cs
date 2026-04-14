@@ -33,9 +33,7 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
         {
             await foreach (var chunk in chunks.WithCancellation(cancellationToken).ConfigureAwait(false))
             {
-                var prompt = "Provide a single concise sentence summarizing the following text for use " +
-                    "in search retrieval. Output only the summary sentence, nothing else.\n\n" +
-                    chunk.Content;
+                var prompt = GetPromptForChunk(chunk);
 
                 var messages = new[]
                 {
@@ -50,6 +48,27 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
 
                 yield return chunk;
             }
+        }
+
+        private static string GetPromptForChunk(IngestionChunk<string> chunk)
+        {
+            var elementType = chunk.Metadata.TryGetValue("element_type", out var t) ? t as string : null;
+
+            var instruction = elementType switch
+            {
+                "table" =>
+                    "Summarize this table for search retrieval. Describe what data it contains, " +
+                    "including key metrics, column headers, and notable values. " +
+                    "Output only the summary sentence, nothing else.",
+                "picture" or "caption" =>
+                    "Summarize what this figure or image refers to for search retrieval. " +
+                    "Output only the summary sentence, nothing else.",
+                _ =>
+                    "Provide a single concise sentence summarizing the following text for use " +
+                    "in search retrieval. Output only the summary sentence, nothing else."
+            };
+
+            return instruction + "\n\n" + chunk.Content;
         }
     }
 }

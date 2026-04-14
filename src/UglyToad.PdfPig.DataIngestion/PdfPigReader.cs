@@ -1,9 +1,11 @@
 namespace UglyToad.PdfPig.DataIngestion
 {
+    using System;
     using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Extensions.DataIngestion;
+    using UglyToad.PdfPig.DocumentLayoutAnalysis;
     using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
     /// <summary>
@@ -16,6 +18,7 @@ namespace UglyToad.PdfPig.DataIngestion
         private readonly IPageSegmenter segmenter;
         private readonly PdfReadingMode mode;
         private readonly int renderDpi;
+        private readonly Func<TextBlock, string?>? elementTypeResolver;
 
         /// <summary>
         /// Creates a new <see cref="PdfPigReader"/>.
@@ -31,11 +34,21 @@ namespace UglyToad.PdfPig.DataIngestion
         /// The DPI to use when rendering page images. Applies to <see cref="PdfReadingMode.Hybrid"/>
         /// and <see cref="PdfReadingMode.VisionOnly"/> modes. Defaults to 150.
         /// </param>
-        public PdfPigReader(IPageSegmenter? segmenter = null, PdfReadingMode mode = PdfReadingMode.TextOnly, int renderDpi = 150)
+        /// <param name="elementTypeResolver">
+        /// Optional delegate that resolves the element type label from a <see cref="TextBlock"/>.
+        /// When provided, the resolved type is stored in element metadata as "element_type".
+        /// This decouples the reader from specific segmenter implementations (e.g. ONNX).
+        /// </param>
+        public PdfPigReader(
+            IPageSegmenter? segmenter = null,
+            PdfReadingMode mode = PdfReadingMode.TextOnly,
+            int renderDpi = 150,
+            Func<TextBlock, string?>? elementTypeResolver = null)
         {
             this.segmenter = segmenter ?? DefaultPageSegmenter.Instance;
             this.mode = mode;
             this.renderDpi = renderDpi;
+            this.elementTypeResolver = elementTypeResolver;
         }
 
         /// <inheritdoc/>
@@ -91,6 +104,12 @@ namespace UglyToad.PdfPig.DataIngestion
                         paragraph.Metadata["BoundingBox.Bottom"] = bbox.Bottom;
                         paragraph.Metadata["BoundingBox.Right"] = bbox.Right;
                         paragraph.Metadata["BoundingBox.Top"] = bbox.Top;
+
+                        var elementType = elementTypeResolver?.Invoke(block);
+                        if (elementType is not null)
+                        {
+                            paragraph.Metadata["element_type"] = elementType;
+                        }
 
                         section.Elements.Add(paragraph);
                     }

@@ -132,7 +132,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
                 if (capturedWords.Count > 0)
                 {
                     var lines = GroupWordsIntoLines(capturedWords);
-                    blocks.Add(new TextBlock(lines));
+                    blocks.Add(new AnnotatedTextBlock(lines, detection.Label, detection.Confidence));
                 }
             }
 
