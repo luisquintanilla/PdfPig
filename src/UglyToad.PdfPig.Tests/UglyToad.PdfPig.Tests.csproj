@@ -104,6 +104,7 @@
         <PackageReference Include="Microsoft.Extensions.DataIngestion.Abstractions" Version="10.4.0-preview.1.26160.2" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
+        <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="1.0.1" />
     </ItemGroup>
 
     <ItemGroup>
