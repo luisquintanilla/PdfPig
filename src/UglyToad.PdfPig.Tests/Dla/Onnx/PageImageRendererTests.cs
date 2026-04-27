@@ -50,6 +50,32 @@ namespace UglyToad.PdfPig.Tests.Dla.Onnx
             Assert.Equal(SKColors.White, bitmap.GetPixel(0, 0));
         }
 
+        [Fact]
+        public void RenderWords_WithWords_RendersNonWhitePixels()
+        {
+            var words = new List<Word>
+            {
+                CreateWord(new PdfRectangle(10, 10, 100, 30))
+            };
+
+            using var bitmap = PageImageRenderer.RenderWords(words, 200, 200, dpi: 72);
+
+            // The word occupies a region — at least one pixel should be non-white (black fill)
+            bool hasNonWhite = false;
+            for (int y = 0; y < bitmap.Height && !hasNonWhite; y++)
+            {
+                for (int x = 0; x < bitmap.Width && !hasNonWhite; x++)
+                {
+                    if (bitmap.GetPixel(x, y) != SKColors.White)
+                    {
+                        hasNonWhite = true;
+                    }
+                }
+            }
+
+            Assert.True(hasNonWhite, "Expected at least one non-white pixel from rendered word bounding box.");
+        }
+
         private static Word CreateWord(PdfRectangle boundingBox)
         {
             var letter = new Letter(
