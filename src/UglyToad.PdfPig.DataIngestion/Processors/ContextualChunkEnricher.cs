@@ -12,7 +12,7 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
     /// Enriches text chunks with contextual summaries for improved RAG retrieval.
     /// Uses <see cref="IChatClient"/> to generate a brief summary of each chunk.
     /// </summary>
-    public class ContextualChunkEnricher : IngestionChunkProcessor<string>
+    public sealed class ContextualChunkEnricher : IngestionChunkProcessor<string>
     {
         private readonly IChatClient chatClient;
 

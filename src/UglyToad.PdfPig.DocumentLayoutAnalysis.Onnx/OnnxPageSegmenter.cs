@@ -4,6 +4,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using UglyToad.PdfPig.Content;
     using UglyToad.PdfPig.Core;
     using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
@@ -12,7 +13,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
     /// Page segmenter that uses an ONNX layout detection model to identify
     /// document regions and assign words to detected blocks.
     /// </summary>
-    public class OnnxPageSegmenter : IPageSegmenter, IDisposable
+    public class OnnxPageSegmenter : IPageSegmenter, IDisposable, IAsyncDisposable
     {
         private readonly ILayoutDetectionModel _model;
         private readonly Microsoft.ML.OnnxRuntime.InferenceSession _session;
@@ -41,6 +42,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A list of text blocks from this approach.</returns>
         public IReadOnlyList<TextBlock> GetBlocks(IEnumerable<Word> words)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var wordList = words?.ToList() ?? throw new ArgumentNullException(nameof(words));
             if (wordList.Count == 0)
             {
@@ -241,6 +243,16 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         {
             Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Asynchronously dispose resources held by this segmenter.
+        /// </summary>
+        public ValueTask DisposeAsync()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+            return ValueTask.CompletedTask;
         }
 
         /// <summary>

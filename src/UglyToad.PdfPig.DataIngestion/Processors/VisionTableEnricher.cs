@@ -11,7 +11,7 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
     /// Enriches table elements in a document by sending their content
     /// to a vision-capable LLM via <see cref="IChatClient"/> to extract markdown table content.
     /// </summary>
-    public class VisionTableEnricher : IngestionDocumentProcessor
+    public sealed class VisionTableEnricher : IngestionDocumentProcessor
     {
         private readonly IChatClient chatClient;
 

@@ -1,8 +1,10 @@
 namespace UglyToad.PdfPig.DataIngestion
 {
+    using System;
     using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using System.Threading;
+    using System.Threading.Tasks;
     using Microsoft.Extensions.DataIngestion;
     using Microsoft.Extensions.DataIngestion.Chunkers;
 
@@ -17,7 +19,7 @@ namespace UglyToad.PdfPig.DataIngestion
     /// the matching elements to the chunk. For keys with conflicting values across
     /// multiple matching elements, the value from the first match wins.
     /// </remarks>
-    public class MetadataAwareSectionChunker : IngestionChunker<string>
+    public sealed class MetadataAwareSectionChunker : IngestionChunker<string>
     {
         private readonly SectionChunker _inner;
 
@@ -37,7 +39,7 @@ namespace UglyToad.PdfPig.DataIngestion
         {
             var elementIndex = BuildElementIndex(document);
 
-            await foreach (var chunk in _inner.ProcessAsync(document, cancellationToken))
+            await foreach (var chunk in _inner.ProcessAsync(document, cancellationToken).ConfigureAwait(false))
             {
                 ResolveMetadata(chunk, elementIndex);
                 yield return chunk;
@@ -94,7 +96,7 @@ namespace UglyToad.PdfPig.DataIngestion
 
             foreach (var (text, metadata) in elementIndex)
             {
-                if (!content.Contains(text))
+                if (!content.Contains(text, StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -102,7 +104,7 @@ namespace UglyToad.PdfPig.DataIngestion
                 foreach (var kvp in metadata)
                 {
                     // Skip bounding box metadata — it's per-element, not meaningful at chunk level
-                    if (kvp.Key.StartsWith("BoundingBox."))
+                    if (kvp.Key.StartsWith("BoundingBox.", StringComparison.Ordinal))
                     {
                         continue;
                     }

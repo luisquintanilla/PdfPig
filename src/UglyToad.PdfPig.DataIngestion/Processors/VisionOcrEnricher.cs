@@ -11,7 +11,7 @@ namespace UglyToad.PdfPig.DataIngestion.Processors
     /// Enriches document elements that have minimal or no text content by performing
     /// vision LLM-based OCR, such as for scanned pages or image-heavy regions.
     /// </summary>
-    public class VisionOcrEnricher : IngestionDocumentProcessor
+    public sealed class VisionOcrEnricher : IngestionDocumentProcessor
     {
         private readonly IChatClient chatClient;
 

@@ -13,7 +13,7 @@ namespace UglyToad.PdfPig.DataIngestion
     /// Supports pluggable page segmentation via <see cref="IPageSegmenter"/> and configurable
     /// reading modes via <see cref="PdfReadingMode"/>.
     /// </summary>
-    public class PdfPigReader : IngestionDocumentReader
+    public sealed class PdfPigReader : IngestionDocumentReader
     {
         private readonly IPageSegmenter segmenter;
         private readonly PdfReadingMode mode;
@@ -52,11 +52,9 @@ namespace UglyToad.PdfPig.DataIngestion
         }
 
         /// <inheritdoc/>
-        public override async Task<IngestionDocument> ReadAsync(
+        public override Task<IngestionDocument> ReadAsync(
             Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
         {
-            await Task.CompletedTask.ConfigureAwait(false);
-
             using var pdfDocument = PdfDocument.Open(source);
             var document = new IngestionDocument(identifier);
 
@@ -131,7 +129,7 @@ namespace UglyToad.PdfPig.DataIngestion
                 document.Sections.Add(section);
             }
 
-            return document;
+            return Task.FromResult(document);
         }
     }
 }

@@ -43,10 +43,8 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             canvas.Clear(padColor);
 
             var destRect = SKRect.Create(padX, padY, newW, newH);
-            using var paint = new SKPaint();
-            paint.FilterQuality = SKFilterQuality.High;
-            paint.IsAntialias = true;
-            canvas.DrawBitmap(image, destRect, paint);
+            using var skImage = SKImage.FromBitmap(image);
+            canvas.DrawImage(skImage, destRect, new SKSamplingOptions(SKCubicResampler.Mitchell));
 
             return result;
         }
@@ -70,10 +68,8 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
 
             using var canvas = new SKCanvas(result);
             var destRect = SKRect.Create(0, 0, targetW, targetH);
-            using var paint = new SKPaint();
-            paint.FilterQuality = SKFilterQuality.High;
-            paint.IsAntialias = true;
-            canvas.DrawBitmap(image, destRect, paint);
+            using var skImage = SKImage.FromBitmap(image);
+            canvas.DrawImage(skImage, destRect, new SKSamplingOptions(SKCubicResampler.Mitchell));
 
             return result;
         }

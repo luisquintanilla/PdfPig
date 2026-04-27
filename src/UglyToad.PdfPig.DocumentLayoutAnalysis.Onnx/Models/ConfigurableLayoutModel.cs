@@ -12,6 +12,14 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
     /// A configuration-driven layout detection model implementation.
     /// Uses <see cref="LayoutModelOptions"/> to determine preprocessing and postprocessing behavior.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Thread safety:</b> This type is not thread-safe. The <see cref="Preprocess"/> method
+    /// stores letterbox state in instance fields that <see cref="Postprocess"/> reads.
+    /// Concurrent Preprocess/Postprocess call pairs will produce incorrect results.
+    /// Use a separate instance per thread, or synchronize access externally.
+    /// </para>
+    /// </remarks>
     public sealed class ConfigurableLayoutModel : ILayoutDetectionModel
     {
         private readonly LayoutModelOptions _options;
