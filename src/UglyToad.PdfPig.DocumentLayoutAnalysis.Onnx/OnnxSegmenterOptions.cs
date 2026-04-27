@@ -10,16 +10,16 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <summary>
         /// Minimum confidence threshold for detections (0.0 to 1.0).
         /// </summary>
-        public float ConfidenceThreshold { get; init; } = 0.3f;
+        public float ConfidenceThreshold { get; set; } = 0.3f;
 
         /// <summary>
         /// ONNX Runtime session options. Use to configure GPU, thread count, etc.
         /// </summary>
-        public SessionOptions? SessionOptions { get; init; }
+        public SessionOptions? SessionOptions { get; set; }
 
         /// <summary>
         /// DPI for rendering the page image. Higher values improve accuracy but are slower.
         /// </summary>
-        public int RenderDpi { get; init; } = 150;
+        public int RenderDpi { get; set; } = 150;
     }
 }
