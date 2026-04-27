@@ -28,10 +28,7 @@ namespace UglyToad.PdfPig.DataIngestion
         /// <exception cref="ArgumentNullException"><paramref name="page"/> is <see langword="null"/>.</exception>
         public static byte[] RenderPage(Page page, int dpi = 150)
         {
-            if (page is null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
+            ArgumentNullException.ThrowIfNull(page);
 
             float scale = dpi / PdfDpi;
             int pixelWidth = Math.Max(1, (int)(page.Width * scale));
@@ -89,10 +86,7 @@ namespace UglyToad.PdfPig.DataIngestion
         /// <exception cref="ArgumentNullException"><paramref name="page"/> is <see langword="null"/>.</exception>
         public static byte[] RenderRegion(Page page, PdfRectangle region, int dpi = 150)
         {
-            if (page is null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
+            ArgumentNullException.ThrowIfNull(page);
 
             float scale = dpi / PdfDpi;
             int pixelWidth = Math.Max(1, (int)(region.Width * scale));

@@ -23,12 +23,9 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A new bitmap with word bounding boxes rendered.</returns>
         public static SKBitmap RenderWords(IReadOnlyList<Word> words, double pageWidth, double pageHeight, int dpi = 150)
         {
-            if (words is null)
-            {
-                throw new ArgumentNullException(nameof(words));
-            }
+            ArgumentNullException.ThrowIfNull(words);
 
-            // Scale from PDF points (72 dpi) to target DPI
+            // Scale from PDF points(72 dpi) to target DPI
             double scale = dpi / 72.0;
             int imageWidth = Math.Max(1, (int)(pageWidth * scale));
             int imageHeight = Math.Max(1, (int)(pageHeight * scale));

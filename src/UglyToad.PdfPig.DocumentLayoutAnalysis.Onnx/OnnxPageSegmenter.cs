@@ -102,7 +102,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             return MapDetectionsToBlocks(filtered, wordList, pageWidth, pageHeight, minX, minY);
         }
 
-        private static IReadOnlyList<TextBlock> MapDetectionsToBlocks(
+        private static List<TextBlock> MapDetectionsToBlocks(
             List<LayoutDetection> detections,
             List<Word> words,
             double pageWidth,

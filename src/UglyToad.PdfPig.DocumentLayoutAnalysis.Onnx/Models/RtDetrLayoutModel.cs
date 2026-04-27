@@ -30,7 +30,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
         private const int ModelInputWidth = 640;
         private const int ModelInputHeight = 640;
 
-        private static readonly IReadOnlyDictionary<int, string> DefaultLabelMapping = new Dictionary<int, string>
+        private static readonly Dictionary<int, string> DefaultLabelMapping = new Dictionary<int, string>
         {
             [0] = "caption",
             [1] = "footnote",
@@ -71,12 +71,9 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
         /// <inheritdoc />
         public IReadOnlyList<NamedOnnxValue> Preprocess(SKBitmap pageImage, int originalWidth, int originalHeight)
         {
-            if (pageImage is null)
-            {
-                throw new ArgumentNullException(nameof(pageImage));
-            }
+            ArgumentNullException.ThrowIfNull(pageImage);
 
-            // Resize to model input dimensions (exact, no letterbox)
+            // Resize to model input dimensions(exact, no letterbox)
             using var resized = ImagePreprocessing.ResizeExact(pageImage, ModelInputWidth, ModelInputHeight);
 
             // Convert to CHW uint8 tensor — normalization is baked into the ONNX graph
@@ -100,10 +97,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
             int originalWidth,
             int originalHeight)
         {
-            if (results is null)
-            {
-                throw new ArgumentNullException(nameof(results));
-            }
+            ArgumentNullException.ThrowIfNull(results);
 
             // Try both naming conventions
             var labelsValue = TryGetOutput(results, "labels") ?? TryGetOutput(results, "pred_labels");

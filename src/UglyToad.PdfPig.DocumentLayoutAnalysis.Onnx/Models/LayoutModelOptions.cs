@@ -46,7 +46,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
         /// <summary>
         /// Whether NMS should be applied to the output detections.
         /// </summary>
-        public bool RequiresNms { get; init; } = false;
+        public bool RequiresNms { get; init; }
 
         /// <summary>
         /// Format of the bounding box coordinates in the model output.
