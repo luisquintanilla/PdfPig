@@ -1,9 +1,11 @@
 namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
 {
     using System;
+    using System.Diagnostics.CodeAnalysis;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
     using Microsoft.Extensions.Options;
+    using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
     /// <summary>
     /// Extension methods for configuring ONNX-based page segmentation services.
@@ -21,12 +23,14 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <param name="configure">Optional delegate to configure <see cref="OnnxSegmenterOptions"/>.</param>
         /// <returns>The service collection for chaining.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
-        public static IServiceCollection AddOnnxPageSegmenter<TModel>(
+        public static IServiceCollection AddOnnxPageSegmenter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TModel>(
             this IServiceCollection services,
             Action<OnnxSegmenterOptions>? configure = null)
             where TModel : class, ILayoutDetectionModel
         {
             ArgumentNullException.ThrowIfNull(services);
+
+            services.AddOptions<OnnxSegmenterOptions>();
 
             if (configure is not null)
             {
@@ -35,6 +39,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
 
             services.TryAddSingleton<ILayoutDetectionModel, TModel>();
             services.TryAddSingleton<OnnxPageSegmenter>();
+            services.TryAddSingleton<IPageSegmenter>(sp => sp.GetRequiredService<OnnxPageSegmenter>());
 
             services.TryAddEnumerable(
                 ServiceDescriptor.Singleton<IValidateOptions<OnnxSegmenterOptions>, OnnxSegmenterOptionsValidator>());

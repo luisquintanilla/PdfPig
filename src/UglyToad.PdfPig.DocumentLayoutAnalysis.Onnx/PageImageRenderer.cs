@@ -25,7 +25,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         {
             ArgumentNullException.ThrowIfNull(words);
 
-            // Scale from PDF points(72 dpi) to target DPI
+            // Scale from PDF points (72 dpi) to target DPI
             double scale = dpi / 72.0;
             int imageWidth = Math.Max(1, (int)(pageWidth * scale));
             int imageHeight = Math.Max(1, (int)(pageHeight * scale));

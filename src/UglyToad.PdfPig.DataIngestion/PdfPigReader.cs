@@ -35,8 +35,13 @@ namespace UglyToad.PdfPig.DataIngestion
             IOptions<PdfPigReaderOptions> options,
             IPageSegmenter? segmenter = null,
             Func<TextBlock, string?>? elementTypeResolver = null)
-            : this(segmenter, options?.Value?.Mode ?? PdfReadingMode.TextOnly, options?.Value?.RenderDpi ?? 150, elementTypeResolver)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            var opts = options.Value;
+            this.segmenter = segmenter ?? DefaultPageSegmenter.Instance;
+            this.mode = opts.Mode;
+            this.renderDpi = opts.RenderDpi;
+            this.elementTypeResolver = elementTypeResolver;
         }
 
         /// <summary>

@@ -73,7 +73,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
         {
             ArgumentNullException.ThrowIfNull(pageImage);
 
-            // Resize to model input dimensions(exact, no letterbox)
+            // Resize to model input dimensions (exact, no letterbox)
             using var resized = ImagePreprocessing.ResizeExact(pageImage, ModelInputWidth, ModelInputHeight);
 
             // Convert to CHW uint8 tensor — normalization is baked into the ONNX graph

@@ -28,7 +28,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <param name="model">The layout detection model to use.</param>
         /// <param name="options">The configured options.</param>
         public OnnxPageSegmenter(ILayoutDetectionModel model, IOptions<OnnxSegmenterOptions> options)
-            : this(model, options?.Value)
+            : this(model, GetOptionsValue(options))
         {
         }
 
@@ -245,6 +245,12 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         private static IReadOnlyList<TextLine> CreateSingleLine(List<Word> words)
         {
             return [new TextLine(words)];
+        }
+
+        private static OnnxSegmenterOptions GetOptionsValue(IOptions<OnnxSegmenterOptions> options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            return options.Value;
         }
 
         /// <summary>

@@ -23,6 +23,8 @@ namespace UglyToad.PdfPig.DataIngestion
         {
             ArgumentNullException.ThrowIfNull(services);
 
+            services.AddOptions<PdfPigReaderOptions>();
+
             if (configure is not null)
             {
                 services.Configure(configure);
