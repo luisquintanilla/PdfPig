@@ -3,6 +3,7 @@ namespace UglyToad.PdfPig.DataIngestion
     using System;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
+    using Microsoft.Extensions.Options;
 
     /// <summary>
     /// Extension methods for configuring PdfPig data ingestion services.
@@ -28,6 +29,9 @@ namespace UglyToad.PdfPig.DataIngestion
             }
 
             services.TryAddSingleton<PdfPigReader>();
+
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IValidateOptions<PdfPigReaderOptions>, PdfPigReaderOptionsValidator>());
 
             return services;
         }

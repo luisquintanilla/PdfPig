@@ -36,6 +36,9 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             services.TryAddSingleton<ILayoutDetectionModel, TModel>();
             services.TryAddSingleton<OnnxPageSegmenter>();
 
+            services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IValidateOptions<OnnxSegmenterOptions>, OnnxSegmenterOptionsValidator>());
+
             return services;
         }
     }

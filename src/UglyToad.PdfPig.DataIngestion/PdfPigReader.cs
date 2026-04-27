@@ -5,6 +5,7 @@ namespace UglyToad.PdfPig.DataIngestion
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Extensions.DataIngestion;
+    using Microsoft.Extensions.Options;
     using UglyToad.PdfPig.DocumentLayoutAnalysis;
     using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
@@ -19,6 +20,24 @@ namespace UglyToad.PdfPig.DataIngestion
         private readonly PdfReadingMode mode;
         private readonly int renderDpi;
         private readonly Func<TextBlock, string?>? elementTypeResolver;
+
+        /// <summary>
+        /// Creates a new <see cref="PdfPigReader"/> using dependency-injected options.
+        /// </summary>
+        /// <param name="options">The configured reader options.</param>
+        /// <param name="segmenter">
+        /// Page segmenter for layout analysis. Defaults to <see cref="DefaultPageSegmenter"/> if <see langword="null"/>.
+        /// </param>
+        /// <param name="elementTypeResolver">
+        /// Optional delegate that resolves the element type label from a <see cref="TextBlock"/>.
+        /// </param>
+        public PdfPigReader(
+            IOptions<PdfPigReaderOptions> options,
+            IPageSegmenter? segmenter = null,
+            Func<TextBlock, string?>? elementTypeResolver = null)
+            : this(segmenter, options?.Value?.Mode ?? PdfReadingMode.TextOnly, options?.Value?.RenderDpi ?? 150, elementTypeResolver)
+        {
+        }
 
         /// <summary>
         /// Creates a new <see cref="PdfPigReader"/>.

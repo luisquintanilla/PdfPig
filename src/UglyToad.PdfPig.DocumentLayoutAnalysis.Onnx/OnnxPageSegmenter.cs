@@ -1,5 +1,6 @@
 namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
 {
+    using Microsoft.Extensions.Options;
     using SkiaSharp;
     using System;
     using System.Collections.Generic;
@@ -20,6 +21,16 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         private readonly float _confidenceThreshold;
         private readonly int _renderDpi;
         private bool _disposed;
+
+        /// <summary>
+        /// Create a new <see cref="OnnxPageSegmenter"/> using dependency-injected options.
+        /// </summary>
+        /// <param name="model">The layout detection model to use.</param>
+        /// <param name="options">The configured options.</param>
+        public OnnxPageSegmenter(ILayoutDetectionModel model, IOptions<OnnxSegmenterOptions> options)
+            : this(model, options?.Value)
+        {
+        }
 
         /// <summary>
         /// Create a new <see cref="OnnxPageSegmenter"/>.
