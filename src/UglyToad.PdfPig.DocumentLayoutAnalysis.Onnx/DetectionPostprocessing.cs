@@ -64,10 +64,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>Filtered detections after NMS.</returns>
         public static IReadOnlyList<LayoutDetection> ApplyNms(IReadOnlyList<LayoutDetection> detections, float iouThreshold = 0.45f)
         {
-            if (detections is null)
-            {
-                throw new ArgumentNullException(nameof(detections));
-            }
+            ArgumentNullException.ThrowIfNull(detections);
 
             if (detections.Count <= 1)
             {
@@ -127,10 +124,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             int padX = 0,
             int padY = 0)
         {
-            if (detections is null)
-            {
-                throw new ArgumentNullException(nameof(detections));
-            }
+            ArgumentNullException.ThrowIfNull(detections);
 
             var result = new List<LayoutDetection>(detections.Count);
 

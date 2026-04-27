@@ -1,7 +1,8 @@
 namespace UglyToad.PdfPig.DataIngestion
 {
-    using SkiaSharp;
     using System;
+    using System.Collections.Generic;
+    using SkiaSharp;
     using UglyToad.PdfPig.Content;
     using UglyToad.PdfPig.Core;
 
@@ -27,10 +28,7 @@ namespace UglyToad.PdfPig.DataIngestion
         /// <exception cref="ArgumentNullException"><paramref name="page"/> is <see langword="null"/>.</exception>
         public static byte[] RenderPage(Page page, int dpi = 150)
         {
-            if (page is null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
+            ArgumentNullException.ThrowIfNull(page);
 
             float scale = dpi / PdfDpi;
             int pixelWidth = Math.Max(1, (int)(page.Width * scale));
@@ -42,18 +40,34 @@ namespace UglyToad.PdfPig.DataIngestion
 
             using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
 
-            foreach (var letter in page.Letters)
+            var fontCache = new Dictionary<float, SKFont>();
+            try
             {
-                float x = (float)letter.Location.X * scale;
-                float y = (float)(page.Height - letter.Location.Y) * scale;
-                float fontSize = (float)letter.PointSize * scale;
-                if (fontSize < MinFontSize)
+                foreach (var letter in page.Letters)
                 {
-                    fontSize = DefaultFontScale * scale;
-                }
+                    float x = (float)letter.Location.X * scale;
+                    float y = (float)(page.Height - letter.Location.Y) * scale;
+                    float fontSize = (float)letter.PointSize * scale;
+                    if (fontSize < MinFontSize)
+                    {
+                        fontSize = DefaultFontScale * scale;
+                    }
 
-                using var font = new SKFont { Size = fontSize };
-                canvas.DrawText(letter.Value, x, y, SKTextAlign.Left, font, paint);
+                    if (!fontCache.TryGetValue(fontSize, out var font))
+                    {
+                        font = new SKFont { Size = fontSize };
+                        fontCache[fontSize] = font;
+                    }
+
+                    canvas.DrawText(letter.Value, x, y, SKTextAlign.Left, font, paint);
+                }
+            }
+            finally
+            {
+                foreach (var font in fontCache.Values)
+                {
+                    font.Dispose();
+                }
             }
 
             using var image = SKImage.FromBitmap(bitmap);
@@ -72,10 +86,7 @@ namespace UglyToad.PdfPig.DataIngestion
         /// <exception cref="ArgumentNullException"><paramref name="page"/> is <see langword="null"/>.</exception>
         public static byte[] RenderRegion(Page page, PdfRectangle region, int dpi = 150)
         {
-            if (page is null)
-            {
-                throw new ArgumentNullException(nameof(page));
-            }
+            ArgumentNullException.ThrowIfNull(page);
 
             float scale = dpi / PdfDpi;
             int pixelWidth = Math.Max(1, (int)(region.Width * scale));
@@ -87,27 +98,43 @@ namespace UglyToad.PdfPig.DataIngestion
 
             using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
 
-            foreach (var letter in page.Letters)
+            var fontCache = new Dictionary<float, SKFont>();
+            try
             {
-                double lx = letter.Location.X;
-                double ly = letter.Location.Y;
-
-                if (lx < region.Left || lx > region.Right || ly < region.Bottom || ly > region.Top)
+                foreach (var letter in page.Letters)
                 {
-                    continue;
-                }
+                    double lx = letter.Location.X;
+                    double ly = letter.Location.Y;
 
-                // Translate so region's bottom-left maps to image (0,0)
-                float x = (float)(lx - region.Left) * scale;
-                float y = (float)(region.Top - ly) * scale;
-                float fontSize = (float)letter.PointSize * scale;
-                if (fontSize < MinFontSize)
+                    if (lx < region.Left || lx > region.Right || ly < region.Bottom || ly > region.Top)
+                    {
+                        continue;
+                    }
+
+                    // Translate so region's bottom-left maps to image (0,0)
+                    float x = (float)(lx - region.Left) * scale;
+                    float y = (float)(region.Top - ly) * scale;
+                    float fontSize = (float)letter.PointSize * scale;
+                    if (fontSize < MinFontSize)
+                    {
+                        fontSize = DefaultFontScale * scale;
+                    }
+
+                    if (!fontCache.TryGetValue(fontSize, out var font))
+                    {
+                        font = new SKFont { Size = fontSize };
+                        fontCache[fontSize] = font;
+                    }
+
+                    canvas.DrawText(letter.Value, x, y, SKTextAlign.Left, font, paint);
+                }
+            }
+            finally
+            {
+                foreach (var font in fontCache.Values)
                 {
-                    fontSize = DefaultFontScale * scale;
+                    font.Dispose();
                 }
-
-                using var font = new SKFont { Size = fontSize };
-                canvas.DrawText(letter.Value, x, y, SKTextAlign.Left, font, paint);
             }
 
             using var image = SKImage.FromBitmap(bitmap);

@@ -22,10 +22,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A new letterboxed bitmap.</returns>
         public static SKBitmap Letterbox(SKBitmap image, int targetW, int targetH, SKColor padColor, out float scale, out int padX, out int padY)
         {
-            if (image is null)
-            {
-                throw new ArgumentNullException(nameof(image));
-            }
+            ArgumentNullException.ThrowIfNull(image);
 
             float scaleX = (float)targetW / image.Width;
             float scaleY = (float)targetH / image.Height;
@@ -43,10 +40,8 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             canvas.Clear(padColor);
 
             var destRect = SKRect.Create(padX, padY, newW, newH);
-            using var paint = new SKPaint();
-            paint.FilterQuality = SKFilterQuality.High;
-            paint.IsAntialias = true;
-            canvas.DrawBitmap(image, destRect, paint);
+            using var skImage = SKImage.FromBitmap(image);
+            canvas.DrawImage(skImage, destRect, new SKSamplingOptions(SKCubicResampler.Mitchell));
 
             return result;
         }
@@ -60,20 +55,15 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A new resized bitmap.</returns>
         public static SKBitmap ResizeExact(SKBitmap image, int targetW, int targetH)
         {
-            if (image is null)
-            {
-                throw new ArgumentNullException(nameof(image));
-            }
+            ArgumentNullException.ThrowIfNull(image);
 
             var info = new SKImageInfo(targetW, targetH, SKColorType.Rgba8888, SKAlphaType.Premul);
             var result = new SKBitmap(info);
 
             using var canvas = new SKCanvas(result);
             var destRect = SKRect.Create(0, 0, targetW, targetH);
-            using var paint = new SKPaint();
-            paint.FilterQuality = SKFilterQuality.High;
-            paint.IsAntialias = true;
-            canvas.DrawBitmap(image, destRect, paint);
+            using var skImage = SKImage.FromBitmap(image);
+            canvas.DrawImage(skImage, destRect, new SKSamplingOptions(SKCubicResampler.Mitchell));
 
             return result;
         }
@@ -86,10 +76,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A dense tensor with shape [1, 3, H, W].</returns>
         public static DenseTensor<byte> ToChwUint8(SKBitmap image)
         {
-            if (image is null)
-            {
-                throw new ArgumentNullException(nameof(image));
-            }
+            ArgumentNullException.ThrowIfNull(image);
 
             int w = image.Width;
             int h = image.Height;
@@ -117,10 +104,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A dense tensor with shape [1, 3, H, W].</returns>
         public static DenseTensor<float> ToChwFloat(SKBitmap image)
         {
-            if (image is null)
-            {
-                throw new ArgumentNullException(nameof(image));
-            }
+            ArgumentNullException.ThrowIfNull(image);
 
             int w = image.Width;
             int h = image.Height;

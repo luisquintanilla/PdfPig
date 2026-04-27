@@ -1,9 +1,11 @@
 namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
 {
+    using Microsoft.Extensions.Options;
     using SkiaSharp;
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using UglyToad.PdfPig.Content;
     using UglyToad.PdfPig.Core;
     using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
@@ -12,13 +14,23 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
     /// Page segmenter that uses an ONNX layout detection model to identify
     /// document regions and assign words to detected blocks.
     /// </summary>
-    public class OnnxPageSegmenter : IPageSegmenter, IDisposable
+    public class OnnxPageSegmenter : IPageSegmenter, IDisposable, IAsyncDisposable
     {
         private readonly ILayoutDetectionModel _model;
         private readonly Microsoft.ML.OnnxRuntime.InferenceSession _session;
         private readonly float _confidenceThreshold;
         private readonly int _renderDpi;
         private bool _disposed;
+
+        /// <summary>
+        /// Create a new <see cref="OnnxPageSegmenter"/> using dependency-injected options.
+        /// </summary>
+        /// <param name="model">The layout detection model to use.</param>
+        /// <param name="options">The configured options.</param>
+        public OnnxPageSegmenter(ILayoutDetectionModel model, IOptions<OnnxSegmenterOptions> options)
+            : this(model, GetOptionsValue(options))
+        {
+        }
 
         /// <summary>
         /// Create a new <see cref="OnnxPageSegmenter"/>.
@@ -41,6 +53,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         /// <returns>A list of text blocks from this approach.</returns>
         public IReadOnlyList<TextBlock> GetBlocks(IEnumerable<Word> words)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var wordList = words?.ToList() ?? throw new ArgumentNullException(nameof(words));
             if (wordList.Count == 0)
             {
@@ -100,7 +113,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             return MapDetectionsToBlocks(filtered, wordList, pageWidth, pageHeight, minX, minY);
         }
 
-        private static IReadOnlyList<TextBlock> MapDetectionsToBlocks(
+        private static List<TextBlock> MapDetectionsToBlocks(
             List<LayoutDetection> detections,
             List<Word> words,
             double pageWidth,
@@ -234,6 +247,12 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
             return [new TextLine(words)];
         }
 
+        private static OnnxSegmenterOptions GetOptionsValue(IOptions<OnnxSegmenterOptions> options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            return options.Value;
+        }
+
         /// <summary>
         /// Dispose resources held by this segmenter.
         /// </summary>
@@ -241,6 +260,16 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
         {
             Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Asynchronously dispose resources held by this segmenter.
+        /// </summary>
+        public ValueTask DisposeAsync()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+            return ValueTask.CompletedTask;
         }
 
         /// <summary>

@@ -9,7 +9,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
     /// sees a regular block; callers that know about this subclass can read <see cref="Label"/>
     /// and <see cref="Confidence"/>.
     /// </summary>
-    public class AnnotatedTextBlock : TextBlock
+    public sealed class AnnotatedTextBlock : TextBlock
     {
         /// <summary>
         /// The element type label detected by the ONNX layout model

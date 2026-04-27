@@ -12,6 +12,14 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
     /// A configuration-driven layout detection model implementation.
     /// Uses <see cref="LayoutModelOptions"/> to determine preprocessing and postprocessing behavior.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Thread safety:</b> This type is not thread-safe. The <see cref="Preprocess"/> method
+    /// stores letterbox state in instance fields that <see cref="Postprocess"/> reads.
+    /// Concurrent Preprocess/Postprocess call pairs will produce incorrect results.
+    /// Use a separate instance per thread, or synchronize access externally.
+    /// </para>
+    /// </remarks>
     public sealed class ConfigurableLayoutModel : ILayoutDetectionModel
     {
         private readonly LayoutModelOptions _options;
@@ -44,10 +52,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
         /// <inheritdoc />
         public IReadOnlyList<NamedOnnxValue> Preprocess(SKBitmap pageImage, int originalWidth, int originalHeight)
         {
-            if (pageImage is null)
-            {
-                throw new ArgumentNullException(nameof(pageImage));
-            }
+            ArgumentNullException.ThrowIfNull(pageImage);
 
             SKBitmap resized;
             _wasLetterboxed = false;
@@ -94,7 +99,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
             }
         }
 
-        private IReadOnlyList<NamedOnnxValue> CreateUint8Input(SKBitmap image)
+        private static List<NamedOnnxValue> CreateUint8Input(SKBitmap image)
         {
             var tensor = ImagePreprocessing.ToChwUint8(image);
             return new List<NamedOnnxValue>
@@ -103,7 +108,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
             };
         }
 
-        private IReadOnlyList<NamedOnnxValue> CreateFloatInput(SKBitmap image)
+        private List<NamedOnnxValue> CreateFloatInput(SKBitmap image)
         {
             var tensor = ImagePreprocessing.ToChwFloat(image);
 
@@ -130,10 +135,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx.Models
             int originalWidth,
             int originalHeight)
         {
-            if (results is null)
-            {
-                throw new ArgumentNullException(nameof(results));
-            }
+            ArgumentNullException.ThrowIfNull(results);
 
             var detections = ParseOutputTensor(results, originalWidth, originalHeight);
 

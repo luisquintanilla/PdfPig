@@ -5,6 +5,7 @@ namespace UglyToad.PdfPig.DataIngestion
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Extensions.DataIngestion;
+    using Microsoft.Extensions.Options;
     using UglyToad.PdfPig.DocumentLayoutAnalysis;
     using UglyToad.PdfPig.DocumentLayoutAnalysis.PageSegmenter;
 
@@ -13,12 +14,35 @@ namespace UglyToad.PdfPig.DataIngestion
     /// Supports pluggable page segmentation via <see cref="IPageSegmenter"/> and configurable
     /// reading modes via <see cref="PdfReadingMode"/>.
     /// </summary>
-    public class PdfPigReader : IngestionDocumentReader
+    public sealed class PdfPigReader : IngestionDocumentReader
     {
         private readonly IPageSegmenter segmenter;
         private readonly PdfReadingMode mode;
         private readonly int renderDpi;
         private readonly Func<TextBlock, string?>? elementTypeResolver;
+
+        /// <summary>
+        /// Creates a new <see cref="PdfPigReader"/> using dependency-injected options.
+        /// </summary>
+        /// <param name="options">The configured reader options.</param>
+        /// <param name="segmenter">
+        /// Page segmenter for layout analysis. Defaults to <see cref="DefaultPageSegmenter"/> if <see langword="null"/>.
+        /// </param>
+        /// <param name="elementTypeResolver">
+        /// Optional delegate that resolves the element type label from a <see cref="TextBlock"/>.
+        /// </param>
+        public PdfPigReader(
+            IOptions<PdfPigReaderOptions> options,
+            IPageSegmenter? segmenter = null,
+            Func<TextBlock, string?>? elementTypeResolver = null)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            var opts = options.Value;
+            this.segmenter = segmenter ?? DefaultPageSegmenter.Instance;
+            this.mode = opts.Mode;
+            this.renderDpi = opts.RenderDpi;
+            this.elementTypeResolver = elementTypeResolver;
+        }
 
         /// <summary>
         /// Creates a new <see cref="PdfPigReader"/>.
@@ -52,11 +76,9 @@ namespace UglyToad.PdfPig.DataIngestion
         }
 
         /// <inheritdoc/>
-        public override async Task<IngestionDocument> ReadAsync(
+        public override Task<IngestionDocument> ReadAsync(
             Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
         {
-            await Task.CompletedTask.ConfigureAwait(false);
-
             using var pdfDocument = PdfDocument.Open(source);
             var document = new IngestionDocument(identifier);
 
@@ -131,7 +153,7 @@ namespace UglyToad.PdfPig.DataIngestion
                 document.Sections.Add(section);
             }
 
-            return document;
+            return Task.FromResult(document);
         }
     }
 }

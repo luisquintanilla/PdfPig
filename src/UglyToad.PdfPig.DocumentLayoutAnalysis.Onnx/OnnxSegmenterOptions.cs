@@ -5,7 +5,7 @@ namespace UglyToad.PdfPig.DocumentLayoutAnalysis.Onnx
     /// <summary>
     /// Options for configuring the <see cref="OnnxPageSegmenter"/>.
     /// </summary>
-    public class OnnxSegmenterOptions
+    public record OnnxSegmenterOptions
     {
         /// <summary>
         /// Minimum confidence threshold for detections (0.0 to 1.0).
